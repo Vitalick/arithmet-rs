@@ -1,7 +1,6 @@
 use crate::domain::operation::Operation;
 use rand::random_range;
 use std::fmt::{Display, Formatter};
-use std::result;
 
 pub trait CalculableExpression {
     fn calculate_expression(&self) -> Result<String, String>;
@@ -71,22 +70,102 @@ impl Exercise {
     }
 
     fn unsafe_random(operation: Operation, result_min: i32, result_max: i32) -> Self {
-        // сделать настройку чтобы не было отрицательных чисел
-        let result = random_range(result_min..result_max);
-        let half_range = (result_max - result_min) / 2;
-        let mut left = random_range(result - half_range..result + half_range);
         match operation {
-            Operation::Addition | Operation::Subtraction => {
+            Operation::Addition => {
+                let result = random_range(result_min..result_max);
+                let left = random_range(0..result);
                 let right = result - left;
+
                 Self::new(left, operation, right)
-            },
+            }
+            Operation::Subtraction => {
+                let left = random_range(result_min..result_max);
+                let right = random_range(0..left);
+
+                Self::new(left, operation, right)
+            }
             Operation::Multiplication => {
+                let result = random_range(result_min..result_max);
+                let mut left = random_range(0..result);
                 if left == 0 {
-                    left = 1
+                    left = 1;
                 }
-                let right = result / left
 
+                let mut right = result / left;
+                let mut candidate = left;
+                let mut offset = 1;
+                let mut direction = 1;
+                let mut calculated = left * right;
 
+                while calculated != result {
+                    if left + offset > result && left - offset < 0 {
+                        return Self::unsafe_random(operation, result_min, result_max);
+                    }
+
+                    candidate = left + offset * direction;
+                    if candidate == 0 {
+                        candidate = 1;
+                    }
+                    right = result / candidate;
+                    calculated = candidate * right;
+
+                    if direction == 1 {
+                        direction = -1;
+                    } else {
+                        direction = 1;
+                        offset += 1;
+                    }
+                }
+
+                if candidate == 1 || right == 1 || result == 1 {
+                    return Self::unsafe_random(operation, result_min, result_max);
+                }
+
+                Self::new(candidate, operation, right)
+            }
+            Operation::Division | Operation::DivisionWithRemainder => {
+                let mut left = random_range(result_min..result_max);
+                let mut right = random_range(0..left / 2) + 1;
+                if right == 0 {
+                    right = 1;
+                }
+
+                let mut result = left / right;
+                let mut candidate = right;
+                let mut offset = 1;
+                let mut direction = 1;
+                let mut calculated = result * right;
+
+                while calculated != left {
+                    if right + offset > left && right - offset < 0 {
+                        return Self::unsafe_random(operation, result_min, result_max);
+                    }
+
+                    candidate = right + offset * direction;
+                    if candidate == 0 {
+                        candidate = 1;
+                    }
+                    result = left / candidate;
+                    calculated = result * candidate;
+
+                    if direction == 1 {
+                        direction = -1;
+                    } else {
+                        direction = 1;
+                        offset += 1;
+                    }
+                }
+
+                right = candidate;
+                if left == 1 || right == 1 || result == 1 {
+                    return Self::unsafe_random(operation, result_min, result_max);
+                }
+
+                if matches!(operation, Operation::DivisionWithRemainder) {
+                    left += random_range(1..right);
+                }
+
+                Self::new(left, operation, right)
             }
         }
     }
@@ -102,6 +181,9 @@ impl Exercise {
             panic!(
                 "Разница межу минимальным и максимальным значением ответа не может быть меньше 50"
             )
+        }
+        if result_min < 0 {
+            panic!("Минимальное значение не может быть меньше нуля")
         }
         loop {
             let result = Self::unsafe_random(operation, result_min, result_max);
