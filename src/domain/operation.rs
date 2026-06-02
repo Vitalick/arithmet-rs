@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use crate::domain::exercise::Exercise;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Operation {
@@ -16,8 +17,7 @@ impl Display for Operation {
             Operation::Addition => write!(f, "+"),
             Operation::Subtraction => write!(f, "-"),
             Operation::Multiplication => write!(f, "*"),
-            Operation::Division => write!(f, "/"),
-            Operation::DivisionWithRemainder => write!(f, ":"),
+            Operation::Division|Operation::DivisionWithRemainder => write!(f, "/"),
         }
     }
 }
@@ -42,11 +42,21 @@ impl From<&str> for Operation {
 }
 
 impl Operation {
+    pub fn hotkey_str(&self) -> String {
+        match self {
+            Operation::DivisionWithRemainder => ":".to_string(),
+            _ => format!("{}", self)
+        }
+    }
 
-    pub fn validates_operands(&self, a: i32, b: i32) -> Result<(), String> {
+    pub fn make_exercise(&self, left: i32, right: i32) -> Exercise {
+         Exercise::new(left, *self, right)
+    }
+
+    pub fn validates_operands(&self, left: i32, right: i32) -> Result<(), String> {
         match self {
             Operation::Division | Operation::DivisionWithRemainder => {
-                if b != 0 {
+                if right != 0 {
                     return Ok(());
                 }
                 Err("Деление на ноль".to_string())
@@ -55,30 +65,31 @@ impl Operation {
         }
     }
 
-    pub fn calculate(&self, a: i32, b: i32) -> Result<i32, String> {
-        self.validates_operands(a, b)?;
+    pub fn calculate(&self, left: i32, right: i32) -> Result<i32, String> {
+        self.validates_operands(left, right)?;
 
         match self {
-            Operation::Addition => Ok(a + b),
-            Operation::Subtraction => Ok(a - b),
-            Operation::Multiplication => Ok(a * b),
-            Operation::Division => Ok(a / b),
-            Operation::DivisionWithRemainder => Ok(a / b),
+            Operation::Addition => Ok(left + right),
+            Operation::Subtraction => Ok(left - right),
+            Operation::Multiplication => Ok(left * right),
+            Operation::Division => Ok(left / right),
+            Operation::DivisionWithRemainder => Ok(left / right),
         }
     }
 
-    pub fn calculate_str(&self, a: i32, b: i32) -> Result<String, String> {
-        self.validates_operands(a, b)?;
+    pub fn calculate_str(&self, left: i32, right: i32) -> Result<String, String> {
+        self.validates_operands(left, right)?;
 
-        let result = self.calculate(a, b)?;
+        let result = self.calculate(left, right)?;
         if matches!(self, Operation::Division | Operation::DivisionWithRemainder) {
-            let reminder = a % b;
+            let reminder = left % right;
             if reminder != 0 {
                 return Ok(format!("{} (остаток {})", result, reminder));
             }
         }
         Ok(format!("{}", result))
     }
+
 }
 
 
