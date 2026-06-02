@@ -94,4 +94,32 @@ mod tests {
         assert_eq!(Operation::Division, '/'.into());
         assert_eq!(Operation::DivisionWithRemainder, ':'.into());
     }
+
+    #[test]
+    fn test_calculate() {
+        assert_eq!(Operation::Addition.calculate(1, 2).unwrap(), 3);
+        assert_eq!(Operation::Subtraction.calculate(5, 3).unwrap(), 2);
+        assert_eq!(Operation::Multiplication.calculate(4, 6).unwrap(), 24);
+        assert_eq!(Operation::Division.calculate(10, 2).unwrap(), 5);
+        assert_eq!(Operation::DivisionWithRemainder.calculate(10, 3).unwrap(), 3);
+    }
+
+    #[test]
+    fn test_calculate_str() {
+        assert_eq!(Operation::Addition.calculate_str(1, 2).unwrap(), "3");
+        assert_eq!(Operation::Subtraction.calculate_str(5, 3).unwrap(), "2");
+        assert_eq!(Operation::Multiplication.calculate_str(4, 6).unwrap(), "24");
+        assert_eq!(Operation::Division.calculate_str(10, 2).unwrap(), "5");
+        assert_eq!(Operation::DivisionWithRemainder.calculate_str(10, 3).unwrap(), "3 (остаток 1)");
+    }
+
+    #[test]
+    fn test_validate_operands() {
+        assert!(Operation::Addition.validates_operands(1, 2).unwrap());
+        assert!(Operation::Subtraction.validates_operands(5, 3).unwrap());
+        assert!(Operation::Multiplication.validates_operands(4, 6).unwrap());
+        assert!(Operation::Division.validates_operands(10, 2).unwrap());
+        assert!(Operation::DivisionWithRemainder.validates_operands(10, 3).unwrap());
+        assert!(Operation::Division.validates_operands(10, 0).is_err());
+    }
 }
