@@ -170,25 +170,30 @@ impl Exercise {
         }
     }
 
-    pub fn random(operation: Operation, result_min: i32, result_max: i32) -> Exercise {
+    pub fn random(
+        operation: Operation,
+        result_min: i32,
+        result_max: i32,
+    ) -> Result<Exercise, String> {
         if result_min == result_max {
-            panic!("Минимальное значение ответа не может совпадать с максимальным")
+            return Err("Минимальное значение ответа не может совпадать с максимальным".to_string());
         }
         if result_min > result_max {
-            panic!("Минимальное значение ответа не может быть выше максимального")
+            return Err("Минимальное значение ответа не может быть выше максимального".to_string());
         }
         if result_max - result_min < 50 {
-            panic!(
+            return Err(
                 "Разница межу минимальным и максимальным значением ответа не может быть меньше 50"
-            )
+                    .to_string(),
+            );
         }
         if result_min < 0 {
-            panic!("Минимальное значение не может быть меньше нуля")
+            return Err("Минимальное значение не может быть меньше нуля".to_string());
         }
         loop {
             let result = Self::unsafe_random(operation, result_min, result_max);
             if result.check_zero().is_ok() {
-                return result
+                return Ok(result);
             }
         }
     }
@@ -248,6 +253,10 @@ impl Display for Exercise {
 mod tests {
     use super::*;
 
+    const RANDOM_MIN: i32 = 100;
+    const RANDOM_MAX: i32 = 150;
+    const RANDOM_SAMPLES: usize = 50;
+
     fn checked_expressions(exercise: Exercise, entered: i32) -> Result<Vec<String>, String> {
         exercise
             .exercise_for_check(entered)?
@@ -261,6 +270,16 @@ mod tests {
             Ok(_) => panic!("expected error: {expected}"),
             Err(error) => assert_eq!(error, expected),
         }
+    }
+
+    fn assert_random_exercise_is_valid(exercise: Exercise, operation: Operation) {
+        assert_eq!(exercise.operation, operation);
+        assert!(exercise.check_zero().is_ok());
+        assert!(exercise.calculate_expression().is_ok());
+    }
+
+    fn random_exercise(operation: Operation) -> Exercise {
+        Exercise::random(operation, RANDOM_MIN, RANDOM_MAX).unwrap()
     }
 
     #[test]
@@ -392,5 +411,115 @@ mod tests {
         for exercise in cases {
             assert_check_error(exercise, 1, "Деление на ноль");
         }
+    }
+
+    #[test]
+    fn test_random_generates_valid_exercise_for_each_operation() {
+        let operations = [
+            Operation::Addition,
+            Operation::Subtraction,
+            Operation::Multiplication,
+            Operation::Division,
+            Operation::DivisionWithRemainder,
+        ];
+
+        for operation in operations {
+            for _ in 0..RANDOM_SAMPLES {
+                let exercise = random_exercise(operation);
+
+                assert_random_exercise_is_valid(exercise, operation);
+            }
+        }
+    }
+
+    #[test]
+    fn test_random_addition_matches_c_generation_rules() {
+        for _ in 0..RANDOM_SAMPLES {
+            let exercise = random_exercise(Operation::Addition);
+            let expected = exercise.expected().unwrap();
+
+            assert_random_exercise_is_valid(exercise, Operation::Addition);
+            assert!((RANDOM_MIN..RANDOM_MAX).contains(&expected));
+            assert_eq!(exercise.left + exercise.right, expected);
+        }
+    }
+
+    #[test]
+    fn test_random_subtraction_matches_c_generation_rules() {
+        for _ in 0..RANDOM_SAMPLES {
+            let exercise = random_exercise(Operation::Subtraction);
+            let expected = exercise.expected().unwrap();
+
+            assert_random_exercise_is_valid(exercise, Operation::Subtraction);
+            assert!((RANDOM_MIN..RANDOM_MAX).contains(&exercise.left));
+            assert!(exercise.right < exercise.left);
+            assert_eq!(exercise.left - exercise.right, expected);
+        }
+    }
+
+    #[test]
+    fn test_random_multiplication_matches_c_generation_rules() {
+        for _ in 0..RANDOM_SAMPLES {
+            let exercise = random_exercise(Operation::Multiplication);
+            let expected = exercise.expected().unwrap();
+
+            assert_random_exercise_is_valid(exercise, Operation::Multiplication);
+            assert!((RANDOM_MIN..RANDOM_MAX).contains(&expected));
+            assert!(exercise.left > 1);
+            assert!(exercise.right > 1);
+            assert!(expected > 1);
+            assert_eq!(exercise.left * exercise.right, expected);
+        }
+    }
+
+    #[test]
+    fn test_random_division_matches_c_generation_rules() {
+        for _ in 0..RANDOM_SAMPLES {
+            let exercise = random_exercise(Operation::Division);
+            let expected = exercise.expected().unwrap();
+
+            assert_random_exercise_is_valid(exercise, Operation::Division);
+            assert!((RANDOM_MIN..RANDOM_MAX).contains(&exercise.left));
+            assert!(exercise.left > 1);
+            assert!(exercise.right > 1);
+            assert!(expected > 1);
+            assert_eq!(exercise.left % exercise.right, 0);
+        }
+    }
+
+    #[test]
+    fn test_random_division_with_remainder_matches_c_generation_rules() {
+        for _ in 0..RANDOM_SAMPLES {
+            let exercise = random_exercise(Operation::DivisionWithRemainder);
+            let expected = exercise.expected().unwrap();
+            let remainder = exercise.left % exercise.right;
+
+            assert_random_exercise_is_valid(exercise, Operation::DivisionWithRemainder);
+            assert!(exercise.left > 1);
+            assert!(exercise.right > 1);
+            assert!(expected > 1);
+            assert!(remainder > 0);
+            assert!(remainder < exercise.right);
+        }
+    }
+
+    #[test]
+    fn test_random_rejects_invalid_ranges() {
+        assert_eq!(
+            Exercise::random(Operation::Addition, 100, 100).unwrap_err(),
+            "Минимальное значение ответа не может совпадать с максимальным",
+        );
+        assert_eq!(
+            Exercise::random(Operation::Addition, 150, 100).unwrap_err(),
+            "Минимальное значение ответа не может быть выше максимального",
+        );
+        assert_eq!(
+            Exercise::random(Operation::Addition, 100, 120).unwrap_err(),
+            "Разница межу минимальным и максимальным значением ответа не может быть меньше 50",
+        );
+        assert_eq!(
+            Exercise::random(Operation::Addition, -1, 100).unwrap_err(),
+            "Минимальное значение не может быть меньше нуля",
+        );
     }
 }
