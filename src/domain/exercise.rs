@@ -1,5 +1,7 @@
 use crate::domain::operation::Operation;
+use rand::random_range;
 use std::fmt::{Display, Formatter};
+use std::result;
 
 pub trait CalculableExpression {
     fn calculate_expression(&self) -> Result<String, String>;
@@ -13,10 +15,7 @@ pub struct Compare {
 
 impl Compare {
     pub fn new(left: i32, right: i32) -> Self {
-        Compare {
-            left,
-            right,
-        }
+        Compare { left, right }
     }
 }
 
@@ -57,7 +56,50 @@ impl CalculableExpression for Exercise {
 
 impl Exercise {
     pub fn new(left: i32, operation: Operation, right: i32) -> Self {
-        Exercise { left, operation, right }
+        Exercise {
+            left,
+            operation,
+            right,
+        }
+    }
+
+    fn check_zero(&self) -> Result<(), String> {
+        if self.left == 0 || self.right == 0 || self.expected()? == 0 {
+            return Err("Все три значения упражнения должны быть отличны от нуля".to_string());
+        }
+        Ok(())
+    }
+
+    fn unsafe_random(operation: Operation, result_min: i32, result_max: i32) -> Self {
+        match operation {
+            Operation::Addition => {
+                let result = random_range(result_min..result_max);
+                let half_range = (result_max - result_min) / 2;
+                let left = random_range(result - half_range..result + half_range);
+            }
+        }
+    }
+
+    pub fn random(operation: Operation, result_min: i32, result_max: i32) -> Exercise {
+        if result_min == result_max {
+            panic!("Минимальное значение ответа не может совпадать с максимальным")
+        }
+        if result_min > result_max {
+            panic!("Минимальное значение ответа не может быть выше максимального")
+        }
+        if result_max - result_min < 50 {
+            panic!(
+                "Разница межу минимальным и максимальным значением ответа не может быть меньше 50"
+            )
+        }
+        let result;
+        'inf_try: while {
+            result = Self::unsafe_random(operation, result_min, result_max);
+            if result.check_zero().is_ok() {
+                break 'inf_try;
+            }
+        }
+        result
     }
 
     pub fn expected(&self) -> Result<i32, String> {
@@ -133,22 +175,10 @@ mod tests {
     #[test]
     fn test_exercise_calculate_expression_for_each_operation() {
         let cases = [
-            (
-                Exercise::new(2, Operation::Addition, 3),
-                "2 + 3 = 5",
-            ),
-            (
-                Exercise::new(7, Operation::Subtraction, 4),
-                "7 - 4 = 3",
-            ),
-            (
-                Exercise::new(6, Operation::Multiplication, 5),
-                "6 * 5 = 30",
-            ),
-            (
-                Exercise::new(20, Operation::Division, 4),
-                "20 / 4 = 5",
-            ),
+            (Exercise::new(2, Operation::Addition, 3), "2 + 3 = 5"),
+            (Exercise::new(7, Operation::Subtraction, 4), "7 - 4 = 3"),
+            (Exercise::new(6, Operation::Multiplication, 5), "6 * 5 = 30"),
+            (Exercise::new(20, Operation::Division, 4), "20 / 4 = 5"),
             (
                 Exercise::new(10, Operation::DivisionWithRemainder, 3),
                 "10 / 3 = 3 (остаток 1)",
