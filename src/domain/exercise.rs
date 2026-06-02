@@ -522,4 +522,24 @@ mod tests {
             "Минимальное значение не может быть меньше нуля",
         );
     }
+
+    #[test]
+    #[ignore = "prints generated random examples for manual inspection"]
+    fn test_random_prints_generated_examples() {
+        let operations = [
+            Operation::Addition,
+            Operation::Subtraction,
+            Operation::Multiplication,
+            Operation::Division,
+            Operation::DivisionWithRemainder,
+        ];
+
+        for operation in operations {
+            println!("{operation:?}:");
+            for _ in 0..10 {
+                let exercise = random_exercise(operation);
+                println!("  {}", exercise.calculate_expression().unwrap());
+            }
+        }
+    }
 }
