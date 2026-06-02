@@ -71,11 +71,22 @@ impl Exercise {
     }
 
     fn unsafe_random(operation: Operation, result_min: i32, result_max: i32) -> Self {
+        // сделать настройку чтобы не было отрицательных чисел
+        let result = random_range(result_min..result_max);
+        let half_range = (result_max - result_min) / 2;
+        let mut left = random_range(result - half_range..result + half_range);
         match operation {
-            Operation::Addition => {
-                let result = random_range(result_min..result_max);
-                let half_range = (result_max - result_min) / 2;
-                let left = random_range(result - half_range..result + half_range);
+            Operation::Addition | Operation::Subtraction => {
+                let right = result - left;
+                Self::new(left, operation, right)
+            },
+            Operation::Multiplication => {
+                if left == 0 {
+                    left = 1
+                }
+                let right = result / left
+
+
             }
         }
     }
