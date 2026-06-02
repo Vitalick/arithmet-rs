@@ -1,5 +1,5 @@
 use crate::domain::operation::Operation;
-use std::fmt::{write, Display, Formatter};
+use std::fmt::{Display, Formatter};
 
 pub trait CalculableExpression {
     fn calculate_expression(&self) -> Result<String, String>;
@@ -72,7 +72,10 @@ impl Exercise {
         self.operation.validates_operands(self.left, self.right)
     }
 
-    pub fn exercise_for_check(&self, entered: i32) -> Result<[dyn CalculableExpression; 2], String> {
+    pub fn exercise_for_check(
+        &self,
+        entered: i32,
+    ) -> Result<[Box<dyn CalculableExpression>; 2], String> {
         if entered == 0 {
             return Err("Ответ не должен быть нулём".to_string());
         }
@@ -83,27 +86,27 @@ impl Exercise {
                 Box::new(Self::new(entered, Operation::Subtraction, self.right)),
             ]),
             Operation::Subtraction => Ok([
-                Self::new(self.left, Operation::Subtraction, entered),
-                Self::new(self.right, Operation::Addition, entered),
+                Box::new(Self::new(self.left, Operation::Subtraction, entered)),
+                Box::new(Self::new(self.right, Operation::Addition, entered)),
             ]),
             Operation::Multiplication => Ok([
-                Self::new(entered, Operation::Division, self.left),
-                Self::new(entered, Operation::Division, self.right),
+                Box::new(Self::new(entered, Operation::Division, self.left)),
+                Box::new(Self::new(entered, Operation::Division, self.right)),
             ]),
             Operation::Division => Ok([
-                Self::new(self.left, Operation::Division, entered),
-                Self::new(self.right, Operation::Multiplication, entered),]
-            ),
+                Box::new(Self::new(self.left, Operation::Division, entered)),
+                Box::new(Self::new(self.right, Operation::Multiplication, entered)),
+            ]),
             Operation::DivisionWithRemainder => Ok([
-                self,
-                Compare::new(self.left % self.right, self.right)
-            ])
+                Box::new(*self),
+                Box::new(Compare::new(self.left % self.right, self.right)),
+            ]),
         }
     }
 }
 
 impl Display for Exercise {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} {} {}", self.left, self.operation, self.right)
     }
 }
