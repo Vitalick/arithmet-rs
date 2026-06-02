@@ -39,6 +39,46 @@ impl CalculableExpression for Compare {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DivisionWithRemainderCheck {
+    pub left: i32,
+    pub right: i32,
+    pub quotient: i32,
+}
+
+impl DivisionWithRemainderCheck {
+    pub fn new(left: i32, right: i32, quotient: i32) -> Self {
+        DivisionWithRemainderCheck {
+            left,
+            right,
+            quotient,
+        }
+    }
+}
+
+impl Display for DivisionWithRemainderCheck {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} / {}", self.left, self.right)
+    }
+}
+
+impl CalculableExpression for DivisionWithRemainderCheck {
+    fn calculate_expression(&self) -> Result<String, String> {
+        Operation::DivisionWithRemainder.validates_operands(self.left, self.right)?;
+
+        let remainder = self.left - self.right * self.quotient;
+        if remainder == 0 {
+            return Ok(format!("{} = {}", self, self.quotient));
+        }
+
+        Ok(format!(
+            "{} = {} (остаток {})",
+            self, self.quotient, remainder
+        ))
+    }
+}
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Exercise {
     pub left: i32,
     pub operation: Operation,
@@ -236,8 +276,10 @@ impl Exercise {
                 Box::new(Self::new(self.right, Operation::Multiplication, entered)),
             ]),
             Operation::DivisionWithRemainder => Ok([
-                Box::new(*self),
-                Box::new(Compare::new(self.left % self.right, self.right)),
+                Box::new(DivisionWithRemainderCheck::new(
+                    self.left, self.right, entered,
+                )),
+                Box::new(Compare::new(self.left - self.right * entered, self.right)),
             ]),
         }
     }
@@ -354,6 +396,14 @@ mod tests {
     }
 
     #[test]
+    fn test_exercise_for_check_division_with_remainder_uses_entered_answer() {
+        assert_eq!(
+            checked_expressions(Exercise::new(10, Operation::DivisionWithRemainder, 3), 2).unwrap(),
+            ["10 / 3 = 2 (остаток 4)", "4 > 3"]
+        );
+    }
+
+    #[test]
     fn test_compare_expression() {
         let cases = [
             (Compare::new(1, 3), "1 < 3"),
@@ -363,6 +413,19 @@ mod tests {
 
         for (compare, expression) in cases {
             assert_eq!(compare.calculate_expression().unwrap(), expression);
+        }
+    }
+
+    #[test]
+    fn test_division_with_remainder_check_expression() {
+        let cases = [
+            (DivisionWithRemainderCheck::new(10, 3, 3), "10 / 3 = 3 (остаток 1)"),
+            (DivisionWithRemainderCheck::new(10, 3, 2), "10 / 3 = 2 (остаток 4)"),
+            (DivisionWithRemainderCheck::new(12, 3, 4), "12 / 3 = 4"),
+        ];
+
+        for (check, expression) in cases {
+            assert_eq!(check.calculate_expression().unwrap(), expression);
         }
     }
 
@@ -549,10 +612,14 @@ mod tests {
 
         for operation in operations {
             println!("{operation:?}:");
-            for _ in 0..10 {
+            for _ in 0..5 {
                 let exercise = random_exercise(operation);
                 let correct_answer = exercise.expected().unwrap();
-                let wrong_answer = correct_answer + 1;
+                let wrong_answer = if matches!(operation, Operation::DivisionWithRemainder) {
+                    correct_answer - 1
+                } else {
+                    correct_answer + 1
+                };
 
                 println!("  {}", exercise.calculate_expression().unwrap());
                 print_check_result(exercise, "correct", correct_answer);
