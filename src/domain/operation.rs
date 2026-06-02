@@ -30,7 +30,7 @@ impl From<char> for Operation {
             '*' => Operation::Multiplication,
             '/' => Operation::Division,
             ':' => Operation::DivisionWithRemainder,
-            _ => panic!("Invalid operation: {}", c),
+            _ => panic!("Некорректная операция: {}", c),
         }
     }
 }
@@ -49,7 +49,7 @@ impl Operation {
                 if b != 0 {
                     return Ok(true);
                 }
-                Err("Division by zero".to_string())
+                Err("Деление на ноль".to_string())
             }
             _ => Ok(true),
         }
