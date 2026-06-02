@@ -43,15 +43,15 @@ impl From<&str> for Operation {
 
 impl Operation {
 
-    pub fn validates_operands(&self, a: i32, b: i32) -> Result<bool, String> {
+    pub fn validates_operands(&self, a: i32, b: i32) -> Result<(), String> {
         match self {
             Operation::Division | Operation::DivisionWithRemainder => {
                 if b != 0 {
-                    return Ok(true);
+                    return Ok(());
                 }
                 Err("Деление на ноль".to_string())
             }
-            _ => Ok(true),
+            _ => Ok(()),
         }
     }
 
@@ -115,11 +115,11 @@ mod tests {
 
     #[test]
     fn test_validate_operands() {
-        assert!(Operation::Addition.validates_operands(1, 2).unwrap());
-        assert!(Operation::Subtraction.validates_operands(5, 3).unwrap());
-        assert!(Operation::Multiplication.validates_operands(4, 6).unwrap());
-        assert!(Operation::Division.validates_operands(10, 2).unwrap());
-        assert!(Operation::DivisionWithRemainder.validates_operands(10, 3).unwrap());
+        assert!(Operation::Addition.validates_operands(1, 2).is_ok());
+        assert!(Operation::Subtraction.validates_operands(5, 3).is_ok());
+        assert!(Operation::Multiplication.validates_operands(4, 6).is_ok());
+        assert!(Operation::Division.validates_operands(10, 2).is_ok());
+        assert!(Operation::DivisionWithRemainder.validates_operands(10, 3).is_ok());
         assert!(Operation::Division.validates_operands(10, 0).is_err());
     }
 }

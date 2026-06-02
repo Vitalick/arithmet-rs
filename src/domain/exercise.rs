@@ -24,10 +24,14 @@ impl Exercise {
         Ok(format!("{} = {}", self, result))
     }
 
-    pub fn exercise_for_check(&self, entered: i32) -> Result<[Exercise; 2], String> {
+    fn validate_operands(&self) -> Result<(), String> {
+        self.operation.validates_operands(self.left, self.right)
+    }
 
+    pub fn exercise_for_check(&self, entered: i32) -> Result<[Exercise; 2], String> {
+        self.validate_operands()?;
         if self.expected() == Ok(entered) {
-            Ok([*self, *self])
+            Ok([*self, *self]) // добавить варианты для проверки на каждый знак
         } else {
             Err(format!("Incorrect answer for exercise: {}", self))
         }
