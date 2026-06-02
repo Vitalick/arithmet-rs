@@ -282,6 +282,19 @@ mod tests {
         Exercise::random(operation, RANDOM_MIN, RANDOM_MAX).unwrap()
     }
 
+    fn print_check_result(exercise: Exercise, answer_kind: &str, answer: i32) {
+        println!("    {answer_kind} answer {answer}:");
+
+        match exercise.exercise_for_check(answer) {
+            Ok(expressions) => {
+                for expression in expressions {
+                    println!("      {}", expression.calculate_expression().unwrap());
+                }
+            }
+            Err(error) => println!("      error: {error}"),
+        }
+    }
+
     #[test]
     fn test_exercise_calculate_expression_for_each_operation() {
         let cases = [
@@ -538,7 +551,13 @@ mod tests {
             println!("{operation:?}:");
             for _ in 0..10 {
                 let exercise = random_exercise(operation);
+                let correct_answer = exercise.expected().unwrap();
+                let wrong_answer = correct_answer + 1;
+
                 println!("  {}", exercise.calculate_expression().unwrap());
+                print_check_result(exercise, "correct", correct_answer);
+                print_check_result(exercise, "wrong", wrong_answer);
+                print_check_result(exercise, "zero", 0);
             }
         }
     }
