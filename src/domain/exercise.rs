@@ -92,14 +92,12 @@ impl Exercise {
                 "Разница межу минимальным и максимальным значением ответа не может быть меньше 50"
             )
         }
-        let result;
-        'inf_try: while {
-            result = Self::unsafe_random(operation, result_min, result_max);
+        loop {
+            let result = Self::unsafe_random(operation, result_min, result_max);
             if result.check_zero().is_ok() {
-                break 'inf_try;
+                return result
             }
         }
-        result
     }
 
     pub fn expected(&self) -> Result<i32, String> {
