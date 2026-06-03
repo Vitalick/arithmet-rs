@@ -31,6 +31,16 @@ impl Display for Operation {
 }
 
 impl Operation {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Operation::Addition => "Сложение",
+            Operation::Subtraction => "Вычитание",
+            Operation::Multiplication => "Умножение",
+            Operation::Division => "Деление",
+            Operation::DivisionWithRemainder => "Деление с остатком",
+        }
+    }
+
     fn from_symbol(symbol: &str) -> Result<Self, String> {
         match symbol {
             "+" => Ok(Operation::Addition),
@@ -183,9 +193,11 @@ mod tests {
         assert!(Operation::Subtraction.validates_operands(5, 3).is_ok());
         assert!(Operation::Multiplication.validates_operands(4, 6).is_ok());
         assert!(Operation::Division.validates_operands(10, 2).is_ok());
-        assert!(Operation::DivisionWithRemainder
-            .validates_operands(10, 3)
-            .is_ok());
+        assert!(
+            Operation::DivisionWithRemainder
+                .validates_operands(10, 3)
+                .is_ok()
+        );
         assert!(Operation::Division.validates_operands(10, 0).is_err());
     }
 }
