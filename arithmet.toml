@@ -1,12 +1,7 @@
 player_name = "неизвестно"
 results_dir = "results"
 
-[operations]
-addition = true
-subtraction = false
-multiplication = false
-division = false
-division_with_remainder = true
+operations = ["+", "-", "*", "/"]
 
 [limits]
 result_min = 100
