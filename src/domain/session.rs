@@ -206,10 +206,8 @@ mod tests {
     }
 
     #[test]
-    fn test_exercises_iter_stops_when_limit_is_zero() {
-        let session = Session::new(settings(0)).unwrap();
-
-        assert!(session.exercises().next().is_none());
+    fn test_session_settings_validation() {
+        assert!(Session::new(settings(0)).is_err());
     }
 
     #[test]
