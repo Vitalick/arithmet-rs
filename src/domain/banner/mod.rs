@@ -6,7 +6,7 @@ use cyrillic::*;
 use latin::*;
 use symbols::*;
 
-pub const HEIGHT: usize = 5;
+pub const HEIGHT: usize = 7;
 
 pub(super) type Glyph = [&'static str; HEIGHT];
 
@@ -62,7 +62,8 @@ fn glyph_for(ch: char) -> Option<&'static Glyph> {
         'В' => Some(&CYR_V),
         'Г' => Some(&CYR_G),
         'Д' => Some(&CYR_D),
-        'Е' | 'Ё' => Some(&CYR_E),
+        'Е' => Some(&CYR_E),
+        'Ё' => Some(&CYR_YO),
         'Ж' => Some(&CYR_ZH),
         'З' => Some(&CYR_Z),
         'И' => Some(&CYR_I),
@@ -163,6 +164,14 @@ mod tests {
     #[test]
     fn latin_y_is_not_cyrillic_u() {
         assert_ne!(render("Y"), render("У"));
+    }
+
+    #[test]
+    fn renders_descenders_on_sixth_row() {
+        assert_eq!(render("Д")[5], "█   █");
+        assert_eq!(render("Ц")[5], "    █");
+        assert_eq!(render("Щ")[5], "     █");
+        assert_eq!(render("Q")[5], "   █");
     }
 
     #[test]
