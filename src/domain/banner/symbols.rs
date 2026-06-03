@@ -177,6 +177,11 @@ pub(super) const SYMBOL_QUESTION: Glyph = [
 ];
 
 #[rustfmt::skip]
+pub(super) const SYMBOL_AT: Glyph = [
+    ""
+];
+
+#[rustfmt::skip]
 pub(super) const SYMBOL_MINUS: Glyph = [
     "   ",
     "   ",
@@ -218,6 +223,17 @@ pub(super) const SYMBOL_SLASH: Glyph = [
     "█   ",
     "    ",
     "    ",
+];
+
+#[rustfmt::skip]
+pub(super) const SYMBOL_PERCENT: Glyph = [
+    "      ",
+    "██  █ ",
+    "██ █  ",
+    "  █ ██",
+    " █  ██",
+    "      ",
+    "      ",
 ];
 
 #[rustfmt::skip]

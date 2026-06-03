@@ -132,10 +132,12 @@ fn glyph_for(ch: char) -> Option<&'static Glyph> {
         ';' => Some(&SYMBOL_SEMICOLON),
         '!' => Some(&SYMBOL_EXCLAMATION),
         '?' => Some(&SYMBOL_QUESTION),
+        '@' => Some(&SYMBOL_AT),
         '-' => Some(&SYMBOL_MINUS),
         '+' => Some(&SYMBOL_PLUS),
         '*' => Some(&SYMBOL_ASTERISK),
         '/' => Some(&SYMBOL_SLASH),
+        '%' => Some(&SYMBOL_PERCENT),
         '=' => Some(&SYMBOL_EQUALS),
         '(' => Some(&SYMBOL_LEFT_PAREN),
         ')' => Some(&SYMBOL_RIGHT_PAREN),
@@ -167,11 +169,17 @@ mod tests {
     }
 
     #[test]
+    fn cyrillic_e_is_not_cyrillic_yo() {
+        assert_ne!(render("Е"), render("Ё"));
+    }
+
+    #[test]
     fn renders_descenders_on_sixth_row() {
-        assert_eq!(render("Д")[5], "█   █");
-        assert_eq!(render("Ц")[5], "    █");
-        assert_eq!(render("Щ")[5], "     █");
-        assert_eq!(render("Q")[5], "   █");
+        assert_eq!(render("Д")[6], "█    █");
+        assert_eq!(render("Ц")[6], "    █");
+        assert_eq!(render("Щ")[6], "     █");
+        assert_eq!(render("Q")[6], "   █");
+        assert_eq!(render(",")[6], "█ ");
     }
 
     #[test]
