@@ -53,7 +53,7 @@ impl Operation {
          Exercise::new(left, *self, right)
     }
 
-    pub fn validates_operands(&self, left: i32, right: i32) -> Result<(), String> {
+    pub fn validates_operands(&self, _left: i32, right: i32) -> Result<(), String> {
         match self {
             Operation::Division | Operation::DivisionWithRemainder => {
                 if right != 0 {

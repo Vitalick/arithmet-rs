@@ -1,82 +1,7 @@
 use crate::domain::operation::Operation;
 use rand::random_range;
 use std::fmt::{Display, Formatter};
-
-pub trait CalculableExpression {
-    fn calculate_expression(&self) -> Result<String, String>;
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Compare {
-    pub left: i32,
-    pub right: i32,
-}
-
-impl Compare {
-    pub fn new(left: i32, right: i32) -> Self {
-        Compare { left, right }
-    }
-}
-
-impl Display for Compare {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ? {}", self.left, self.right)
-    }
-}
-
-impl CalculableExpression for Compare {
-    fn calculate_expression(&self) -> Result<String, String> {
-        let symbol;
-        if self.left > self.right {
-            symbol = ">"
-        } else if self.left < self.right {
-            symbol = "<"
-        } else {
-            symbol = "="
-        }
-        Ok(format!("{} {} {}", self.left, symbol, self.right))
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DivisionWithRemainderCheck {
-    pub left: i32,
-    pub right: i32,
-    pub quotient: i32,
-}
-
-impl DivisionWithRemainderCheck {
-    pub fn new(left: i32, right: i32, quotient: i32) -> Self {
-        DivisionWithRemainderCheck {
-            left,
-            right,
-            quotient,
-        }
-    }
-}
-
-impl Display for DivisionWithRemainderCheck {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} / {}", self.left, self.right)
-    }
-}
-
-impl CalculableExpression for DivisionWithRemainderCheck {
-    fn calculate_expression(&self) -> Result<String, String> {
-        Operation::DivisionWithRemainder.validates_operands(self.left, self.right)?;
-
-        let remainder = self.left - self.right * self.quotient;
-        if remainder == 0 {
-            return Ok(format!("{} = {}", self, self.quotient));
-        }
-
-        Ok(format!(
-            "{} = {} (остаток {})",
-            self, self.quotient, remainder
-        ))
-    }
-}
-
+use crate::domain::expression::{Compare, DivisionWithRemainderCheck, Expression};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Exercise {
@@ -85,11 +10,17 @@ pub struct Exercise {
     pub right: i32,
 }
 
-impl CalculableExpression for Exercise {
-    fn calculate_expression(&self) -> Result<String, String> {
+impl Expression for Exercise {
+    fn evaluate(&self) -> Result<String, String> {
         let result = self.expected_str()?;
 
         Ok(format!("{} = {}", self, result))
+    }
+}
+
+impl Display for Exercise {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {} {}", self.left, self.operation, self.right)
     }
 }
 
@@ -216,7 +147,9 @@ impl Exercise {
         result_max: i32,
     ) -> Result<Exercise, String> {
         if result_min == result_max {
-            return Err("Минимальное значение ответа не может совпадать с максимальным".to_string());
+            return Err(
+                "Минимальное значение ответа не может совпадать с максимальным".to_string(),
+            );
         }
         if result_min > result_max {
             return Err("Минимальное значение ответа не может быть выше максимального".to_string());
@@ -250,10 +183,10 @@ impl Exercise {
         self.operation.validates_operands(self.left, self.right)
     }
 
-    pub fn exercise_for_check(
+    pub fn check_expressions(
         &self,
         entered: i32,
-    ) -> Result<[Box<dyn CalculableExpression>; 2], String> {
+    ) -> Result<[Box<dyn Expression>; 2], String> {
         if entered == 0 {
             return Err("Ответ не должен быть нулём".to_string());
         }
@@ -285,14 +218,9 @@ impl Exercise {
     }
 }
 
-impl Display for Exercise {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {} {}", self.left, self.operation, self.right)
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::domain::expression::Expression;
     use super::*;
 
     const RANDOM_MIN: i32 = 100;
@@ -301,14 +229,14 @@ mod tests {
 
     fn checked_expressions(exercise: Exercise, entered: i32) -> Result<Vec<String>, String> {
         exercise
-            .exercise_for_check(entered)?
+            .check_expressions(entered)?
             .into_iter()
-            .map(|expression| expression.calculate_expression())
+            .map(|expression| expression.evaluate())
             .collect()
     }
 
     fn assert_check_error(exercise: Exercise, entered: i32, expected: &str) {
-        match exercise.exercise_for_check(entered) {
+        match exercise.check_expressions(entered) {
             Ok(_) => panic!("expected error: {expected}"),
             Err(error) => assert_eq!(error, expected),
         }
@@ -317,7 +245,7 @@ mod tests {
     fn assert_random_exercise_is_valid(exercise: Exercise, operation: Operation) {
         assert_eq!(exercise.operation, operation);
         assert!(exercise.check_zero().is_ok());
-        assert!(exercise.calculate_expression().is_ok());
+        assert!(exercise.evaluate().is_ok());
     }
 
     fn random_exercise(operation: Operation) -> Exercise {
@@ -327,10 +255,10 @@ mod tests {
     fn print_check_result(exercise: Exercise, answer_kind: &str, answer: i32) {
         println!("    {answer_kind} answer {answer}:");
 
-        match exercise.exercise_for_check(answer) {
+        match exercise.check_expressions(answer) {
             Ok(expressions) => {
                 for expression in expressions {
-                    println!("      {}", expression.calculate_expression().unwrap());
+                    println!("      {}", expression.evaluate().unwrap());
                 }
             }
             Err(error) => println!("      error: {error}"),
@@ -351,7 +279,7 @@ mod tests {
         ];
 
         for (exercise, expression) in cases {
-            assert_eq!(exercise.calculate_expression().unwrap(), expression);
+            assert_eq!(exercise.evaluate().unwrap(), expression);
         }
     }
 
@@ -402,33 +330,6 @@ mod tests {
             ["10 / 3 = 2 (остаток 4)", "4 > 3"]
         );
     }
-
-    #[test]
-    fn test_compare_expression() {
-        let cases = [
-            (Compare::new(1, 3), "1 < 3"),
-            (Compare::new(3, 1), "3 > 1"),
-            (Compare::new(3, 3), "3 = 3"),
-        ];
-
-        for (compare, expression) in cases {
-            assert_eq!(compare.calculate_expression().unwrap(), expression);
-        }
-    }
-
-    #[test]
-    fn test_division_with_remainder_check_expression() {
-        let cases = [
-            (DivisionWithRemainderCheck::new(10, 3, 3), "10 / 3 = 3 (остаток 1)"),
-            (DivisionWithRemainderCheck::new(10, 3, 2), "10 / 3 = 2 (остаток 4)"),
-            (DivisionWithRemainderCheck::new(12, 3, 4), "12 / 3 = 4"),
-        ];
-
-        for (check, expression) in cases {
-            assert_eq!(check.calculate_expression().unwrap(), expression);
-        }
-    }
-
     #[test]
     fn test_exercise_calculate_expression_with_zero_operands() {
         let cases = [
@@ -443,7 +344,7 @@ mod tests {
         ];
 
         for (exercise, expression) in cases {
-            assert_eq!(exercise.calculate_expression().unwrap(), expression);
+            assert_eq!(exercise.evaluate().unwrap(), expression);
         }
     }
 
@@ -453,11 +354,11 @@ mod tests {
         let division_with_remainder = Exercise::new(5, Operation::DivisionWithRemainder, 0);
 
         assert_eq!(
-            division.calculate_expression().unwrap_err(),
+            division.evaluate().unwrap_err(),
             "Деление на ноль"
         );
         assert_eq!(
-            division_with_remainder.calculate_expression().unwrap_err(),
+            division_with_remainder.evaluate().unwrap_err(),
             "Деление на ноль"
         );
     }
@@ -621,7 +522,7 @@ mod tests {
                     correct_answer + 1
                 };
 
-                println!("  {}", exercise.calculate_expression().unwrap());
+                println!("  {}", exercise.evaluate().unwrap());
                 print_check_result(exercise, "correct", correct_answer);
                 print_check_result(exercise, "wrong", wrong_answer);
                 print_check_result(exercise, "zero", 0);
