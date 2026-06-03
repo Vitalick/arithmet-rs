@@ -53,8 +53,12 @@ impl Grade {
         Grade::One
     }
 
+    pub fn banner_text(&self) -> String {
+        format!("Ваша оценка {}", self.value())
+    }
+
     pub fn banner(&self) -> Vec<String> {
-        crate::domain::banner::render(&format!("Ваша оценка {}", self.value()))
+        crate::domain::banner::render(&self.banner_text())
     }
 
     fn value(&self) -> u8 {
