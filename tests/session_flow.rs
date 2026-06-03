@@ -67,10 +67,24 @@ fn session_generates_answers_and_writes_result() {
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
-    assert_eq!(result_files.len(), 1);
+    assert_eq!(result_files.len(), 2);
 
-    let result_path = result_files[0].path();
-    let output = fs::read_to_string(result_path).unwrap();
+    let json_path = result_files
+        .iter()
+        .map(|entry| entry.path())
+        .find(|path| path.extension().unwrap() == "json")
+        .unwrap();
+    let txt_path = result_files
+        .iter()
+        .map(|entry| entry.path())
+        .find(|path| path.extension().unwrap() == "txt")
+        .unwrap();
+    assert_eq!(
+        json_path.file_stem().unwrap(),
+        txt_path.file_stem().unwrap()
+    );
+
+    let output = fs::read_to_string(json_path).unwrap();
     let saved: Value = serde_json::from_str(&output).unwrap();
 
     assert_eq!(saved["settings"]["player_name"], "integration_player");
@@ -79,4 +93,15 @@ fn session_generates_answers_and_writes_result() {
     assert_eq!(saved["answers"].as_array().unwrap().len(), 3);
     assert_eq!(saved["correct_answers"], 3);
     assert_eq!(saved["grade"], "Five");
+
+    let human_output = fs::read_to_string(txt_path).unwrap();
+    assert!(human_output.contains("Имя: integration_player"));
+    assert!(human_output.contains("Действия:  сложение"));
+    assert!(human_output.contains("Верных ответов: 3,  оценка: 5"));
+    assert!(
+        human_output.contains("Количество действий:            сложение - 3, верных ответов - 3")
+    );
+    assert!(human_output.contains("Предложенные действия:"));
+    assert!(human_output.contains("прошла   1 секунда"));
+    assert!(human_output.contains("Время:  лучшее - 1, худшее - 1, среднее - 1"));
 }

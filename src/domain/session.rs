@@ -3,8 +3,18 @@ use crate::domain::expression::Expression;
 use crate::domain::grade::Grade;
 use crate::domain::operation::Operation;
 use crate::domain::settings::Settings;
+use std::fmt::Write as _;
+use std::path::{Path, PathBuf};
 use time::OffsetDateTime;
 use validations::Validate;
+
+const PROTOCOL_OPERATION_ORDER: [Operation; 5] = [
+    Operation::Addition,
+    Operation::Subtraction,
+    Operation::Multiplication,
+    Operation::Division,
+    Operation::DivisionWithRemainder,
+];
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum AnswerError {
@@ -58,13 +68,12 @@ pub struct SessionExerciseIter<'a> {
 impl Session {
     pub fn new(settings: Settings) -> Result<Self, String> {
         match settings.validate() {
-            Ok(_) =>
-                Ok(Session {
-                    settings,
-                    answers: Vec::new(),
-                    correct_answers: 0,
-                    grade: Grade::default(),
-                }),
+            Ok(_) => Ok(Session {
+                settings,
+                answers: Vec::new(),
+                correct_answers: 0,
+                grade: Grade::default(),
+            }),
             Err(e) => Err(e.to_string()),
         }
     }
@@ -123,17 +132,199 @@ impl Session {
     }
 
     pub fn save(&self) -> Result<(), std::io::Error> {
-        use std::fs;
+        let results_dir = self.results_dir();
+        std::fs::create_dir_all(&results_dir)?;
+        let saved_at = OffsetDateTime::now_utc();
+        let result_path = results_dir.join(Self::filename_datetime(saved_at));
 
+        self.save_json(&result_path)?;
+        self.save_txt(&result_path, saved_at)?;
+        Ok(())
+    }
+
+    fn results_dir(&self) -> PathBuf {
         let translit_name = deunicode::deunicode(&self.settings.player_name);
-        let results_dir = format!("{}/{}", self.settings.results_dir, translit_name);
-        if !fs::exists(&results_dir)? {
-            fs::create_dir_all(&results_dir)?;
-        }
-        let file_path = format!("{}/{}.json", results_dir, OffsetDateTime::now_utc());
-        let file = fs::File::create(&file_path)?;
+        Path::new(&self.settings.results_dir).join(translit_name)
+    }
+
+    fn save_json(&self, result_path: &Path) -> Result<(), std::io::Error> {
+        let file = std::fs::File::create(result_path.with_extension("json"))?;
         serde_json::to_writer_pretty(file, self)?;
         Ok(())
+    }
+
+    fn save_txt(&self, result_path: &Path, saved_at: OffsetDateTime) -> Result<(), std::io::Error> {
+        std::fs::write(
+            result_path.with_extension("txt"),
+            self.human_results(saved_at),
+        )
+    }
+
+    fn filename_datetime(date_time: OffsetDateTime) -> String {
+        format!(
+            "{:04}-{:02}-{:02}_{:02}-{:02}-{:02}",
+            date_time.year(),
+            u8::from(date_time.month()),
+            date_time.day(),
+            date_time.hour(),
+            date_time.minute(),
+            date_time.second()
+        )
+    }
+
+    fn human_results(&self, saved_at: OffsetDateTime) -> String {
+        let mut output = String::new();
+        let operations = self.enabled_operations();
+
+        let _ = writeln!(
+            output,
+            "Имя: {}     дата: {:2}.{:02}.{}  время: {:2}:{:02}:{:02}",
+            self.settings.player_name,
+            saved_at.day(),
+            u8::from(saved_at.month()),
+            saved_at.year(),
+            saved_at.hour(),
+            saved_at.minute(),
+            saved_at.second()
+        );
+        let _ = writeln!(
+            output,
+            "Действия: {}",
+            operations
+                .iter()
+                .map(|operation| format!(" {}", Self::operation_protocol_name(*operation)))
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        let _ = writeln!(
+            output,
+            "Количество: {},  пределы: от {} до {},  сложность: {}",
+            self.settings.limits.exercise_count,
+            self.settings.limits.result_min,
+            self.settings.limits.result_max,
+            self.settings.limits.answer_time_seconds.as_secs()
+        );
+        let _ = writeln!(
+            output,
+            "Верных ответов: {},  оценка: {}",
+            self.correct_answers, self.grade as u8
+        );
+
+        let _ = write!(output, "Количество действий: ");
+        for (index, operation) in operations.iter().enumerate() {
+            if index > 0 {
+                let _ = write!(output, "                     ");
+            }
+            let total = self
+                .answers
+                .iter()
+                .filter(|answer| answer.exercise.operation == *operation)
+                .count();
+            let correct = self
+                .answers
+                .iter()
+                .filter(|answer| answer.exercise.operation == *operation && answer.is_correct())
+                .count();
+            let _ = writeln!(
+                output,
+                "{:>19} - {}, верных ответов - {}",
+                Self::operation_protocol_name(*operation),
+                total,
+                correct
+            );
+        }
+
+        let _ = writeln!(output, "Предложенные действия:");
+        for (index, answer) in self.answers.iter().enumerate() {
+            let correctness = if answer.is_correct() {
+                "  верно"
+            } else {
+                "неверно"
+            };
+            let exercise = format!(
+                "{}{}{}={}",
+                answer.exercise.left,
+                answer.exercise.operation.symbol(),
+                answer.exercise.right,
+                answer.exercise.expected().unwrap_or(0)
+            );
+            let _ = write!(
+                output,
+                "{:3}. {}:   {:<18}",
+                index + 1,
+                correctness,
+                exercise
+            );
+            let _ = write!(output, "{:<21}", answer.protocol_entered());
+            let seconds = answer.time_elapsed.as_secs();
+            let (verb, noun) = Self::seconds_words(seconds);
+            let _ = writeln!(output, "  {} {:3} {}", verb, seconds, noun);
+        }
+
+        if let Some((best, worst, average)) = self.time_stats() {
+            let _ = writeln!(
+                output,
+                "                     Время:  лучшее - {}, худшее - {}, среднее - {}",
+                best, worst, average
+            );
+        }
+
+        output
+    }
+
+    fn enabled_operations(&self) -> Vec<Operation> {
+        PROTOCOL_OPERATION_ORDER
+            .iter()
+            .copied()
+            .filter(|operation| self.settings.operations.contains(operation))
+            .collect()
+    }
+
+    fn operation_protocol_name(operation: Operation) -> String {
+        operation.label().to_lowercase()
+    }
+
+    fn seconds_words(seconds: u64) -> (&'static str, &'static str) {
+        let remainder = if (11..=14).contains(&(seconds % 100)) {
+            0
+        } else {
+            seconds % 10
+        };
+        match remainder {
+            1 => ("прошла", "секунда"),
+            2..=4 => ("прошло", "секунды"),
+            _ => ("прошло", "секунд"),
+        }
+    }
+
+    fn time_stats(&self) -> Option<(u64, u64, u64)> {
+        let seconds = self
+            .answers
+            .iter()
+            .filter(|answer| answer.entered.is_ok())
+            .map(|answer| answer.time_elapsed.as_secs())
+            .collect::<Vec<_>>();
+        let count = seconds.len() as u64;
+        if count == 0 {
+            return None;
+        }
+
+        let best = seconds.iter().min().copied().unwrap();
+        let worst = seconds.iter().max().copied().unwrap();
+        let average = seconds.iter().sum::<u64>() / count;
+        Some((best, worst, average))
+    }
+}
+
+impl Answer {
+    fn protocol_entered(&self) -> String {
+        match self.entered {
+            Ok(entered) => format!("введено {:<5}", entered),
+            Err(AnswerError::Escaped) => "нажата клавиша <Esc>".to_string(),
+            Err(AnswerError::TimedOut) => "вышло время".to_string(),
+            Err(AnswerError::SessionAborted) => "нажата клавиша <F10>".to_string(),
+            Err(AnswerError::InvalidInput) => "некорректный ввод".to_string(),
+        }
     }
 }
 

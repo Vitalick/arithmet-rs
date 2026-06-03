@@ -52,7 +52,7 @@ impl Operation {
         }
     }
 
-    fn symbol(&self) -> &'static str {
+    pub fn symbol(&self) -> &'static str {
         match self {
             Operation::Addition => "+",
             Operation::Subtraction => "-",
@@ -193,11 +193,9 @@ mod tests {
         assert!(Operation::Subtraction.validates_operands(5, 3).is_ok());
         assert!(Operation::Multiplication.validates_operands(4, 6).is_ok());
         assert!(Operation::Division.validates_operands(10, 2).is_ok());
-        assert!(
-            Operation::DivisionWithRemainder
-                .validates_operands(10, 3)
-                .is_ok()
-        );
+        assert!(Operation::DivisionWithRemainder
+            .validates_operands(10, 3)
+            .is_ok());
         assert!(Operation::Division.validates_operands(10, 0).is_err());
     }
 }
