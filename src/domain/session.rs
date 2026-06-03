@@ -1,7 +1,8 @@
 use crate::domain::exercise::Exercise;
 use crate::domain::grade::Grade;
+use crate::domain::operation::Operation;
 use crate::domain::settings::Settings;
-
+use rand::random_range;
 
 #[derive(Debug, Clone)]
 pub enum AnswerError {
@@ -10,7 +11,6 @@ pub enum AnswerError {
     SessionAborted,
     InvalidInput,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct Answer {
@@ -34,5 +34,18 @@ impl Session {
             answers: Vec::new(),
             grade: Grade::default(),
         }
+    }
+
+    fn random_operation(&self) -> Operation {
+        let operations = Vec::from_iter(self.settings.operations.iter().cloned());
+        operations[random_range(0..operations.len())]
+    }
+
+    fn random_exercise(&self) -> Result<Exercise, String> {
+        Exercise::random(
+            self.random_operation(),
+            self.settings.limits.result_min,
+            self.settings.limits.result_max,
+        )
     }
 }
