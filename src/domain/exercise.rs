@@ -1,7 +1,7 @@
+use crate::domain::expression::{Compare, Expression, FakeExercise};
 use crate::domain::operation::Operation;
 use rand::random_range;
 use std::fmt::{Display, Formatter};
-use crate::domain::expression::{Compare, DivisionWithRemainderCheck, Expression};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Exercise {
@@ -175,6 +175,10 @@ impl Exercise {
         self.operation.calculate(self.left, self.right)
     }
 
+    pub fn expected_remainder(&self) -> Result<i32, String> {
+        self.operation.calculate_remainder(self.left, self.right)
+    }
+
     pub fn expected_str(&self) -> Result<String, String> {
         self.operation.calculate_str(self.left, self.right)
     }
@@ -183,10 +187,7 @@ impl Exercise {
         self.operation.validates_operands(self.left, self.right)
     }
 
-    pub fn check_expressions(
-        &self,
-        entered: i32,
-    ) -> Result<[Box<dyn Expression>; 2], String> {
+    pub fn check_expressions(&self, entered: i32) -> Result<[Box<dyn Expression>; 2], String> {
         if entered == 0 {
             return Err("Ответ не должен быть нулём".to_string());
         }
@@ -209,9 +210,11 @@ impl Exercise {
                 Box::new(Self::new(self.right, Operation::Multiplication, entered)),
             ]),
             Operation::DivisionWithRemainder => Ok([
-                Box::new(DivisionWithRemainderCheck::new(
-                    self.left, self.right, entered,
-                )),
+                Box::new(
+                    FakeExercise::clone_exercise(*self)?
+                        .with_answer(entered)
+                        .with_remainder(self.left - self.right * entered),
+                ),
                 Box::new(Compare::new(self.left - self.right * entered, self.right)),
             ]),
         }
@@ -220,8 +223,8 @@ impl Exercise {
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::expression::Expression;
     use super::*;
+    use crate::domain::expression::Expression;
 
     const RANDOM_MIN: i32 = 100;
     const RANDOM_MAX: i32 = 150;
@@ -353,10 +356,7 @@ mod tests {
         let division = Exercise::new(5, Operation::Division, 0);
         let division_with_remainder = Exercise::new(5, Operation::DivisionWithRemainder, 0);
 
-        assert_eq!(
-            division.evaluate().unwrap_err(),
-            "Деление на ноль"
-        );
+        assert_eq!(division.evaluate().unwrap_err(), "Деление на ноль");
         assert_eq!(
             division_with_remainder.evaluate().unwrap_err(),
             "Деление на ноль"

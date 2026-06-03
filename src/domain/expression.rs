@@ -1,11 +1,10 @@
-use std::fmt::{Display, Formatter};
+use crate::domain::exercise::Exercise;
 use crate::domain::operation::Operation;
+use std::fmt::{Display, Formatter};
 
-pub trait Expression {
+pub trait Expression: Display {
     fn evaluate(&self) -> Result<String, String>;
-}
 
-impl Display for dyn Expression {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.evaluate().unwrap())
     }
@@ -44,41 +43,82 @@ impl Expression for Compare {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DivisionWithRemainderCheck {
+pub struct FakeExercise {
     pub left: i32,
+    pub operation: Operation,
     pub right: i32,
-    pub quotient: i32,
+    pub answer: i32,
+    pub remainder: i32,
 }
 
-impl DivisionWithRemainderCheck {
-    pub fn new(left: i32, right: i32, quotient: i32) -> Self {
-        DivisionWithRemainderCheck {
+impl FakeExercise {
+    pub fn new(left: i32, operation: Operation, right: i32, answer: i32) -> Self {
+        FakeExercise {
             left,
+            operation,
             right,
-            quotient,
+            answer,
+            remainder: 0,
         }
     }
-}
 
-impl Display for DivisionWithRemainderCheck {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} / {}", self.left, self.right)
+    pub fn new_with_remainer(
+        left: i32,
+        operation: Operation,
+        right: i32,
+        answer: i32,
+        remainder: i32,
+    ) -> Self {
+        FakeExercise {
+            left,
+            operation,
+            right,
+            answer,
+            remainder,
+        }
+    }
+
+    pub fn with_remainder(self, remainder: i32) -> Self {
+        FakeExercise { remainder, ..self }
+    }
+
+    pub fn with_answer(self, answer: i32) -> Self {
+        FakeExercise { answer, ..self }
+    }
+
+    pub fn clone_exercise(exercise: Exercise) -> Result<Self, String> {
+        Ok(FakeExercise {
+            left: exercise.left,
+            operation: exercise.operation,
+            right: exercise.right,
+            answer: exercise.expected()?,
+            remainder: exercise.expected_remainder()?,
+        })
     }
 }
 
-impl Expression for DivisionWithRemainderCheck {
+impl From<Exercise> for FakeExercise {
+    fn from(exercise: Exercise) -> Self {
+        FakeExercise::clone_exercise(exercise).unwrap()
+    }
+}
+
+impl Display for FakeExercise {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {} {}", self.left, self.operation, self.right)
+    }
+}
+
+impl Expression for FakeExercise {
     fn evaluate(&self) -> Result<String, String> {
         Operation::DivisionWithRemainder.validates_operands(self.left, self.right)?;
-
-        let remainder = self.left - self.right * self.quotient;
-        if remainder == 0 {
-            return Ok(format!("{} = {}", self, self.quotient));
+        match self.remainder {
+            0 => Ok(format!("{} = {}", self, self.answer)),
+            _ => Ok(format!(
+                "{} = {} (остаток {})",
+                self, self.answer, self.remainder
+            )),
         }
-
-        Ok(format!(
-            "{} = {} (остаток {})",
-            self, self.quotient, remainder
-        ))
     }
 }
 
@@ -88,7 +128,7 @@ mod tests {
 
     #[test]
     fn test_division_with_remainder() {
-        let division = DivisionWithRemainderCheck::new(10, 3, 3);
+        let division = FakeExercise::new_with_remainer(10, Operation::Division, 3, 3, 1);
         assert_eq!(division.evaluate().unwrap(), "10 / 3 = 3 (остаток 1)");
     }
 
@@ -109,19 +149,21 @@ mod tests {
     fn test_division_with_remainder_check_expression() {
         let cases = [
             (
-                DivisionWithRemainderCheck::new(10, 3, 3),
+                FakeExercise::new_with_remainer(10, Operation::Division, 3, 3, 1),
                 "10 / 3 = 3 (остаток 1)",
             ),
             (
-                DivisionWithRemainderCheck::new(10, 3, 2),
+                FakeExercise::new_with_remainer(10, Operation::Division, 3, 2, 4),
                 "10 / 3 = 2 (остаток 4)",
             ),
-            (DivisionWithRemainderCheck::new(12, 3, 4), "12 / 3 = 4"),
+            (
+                FakeExercise::new(12, Operation::Division, 3, 4),
+                "12 / 3 = 4",
+            ),
         ];
 
         for (check, expression) in cases {
             assert_eq!(check.evaluate().unwrap(), expression);
         }
     }
-
 }

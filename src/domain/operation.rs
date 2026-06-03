@@ -1,14 +1,22 @@
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::Display;
+
 use crate::domain::exercise::Exercise;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Operation {
-    Addition,              // сложение
-    Subtraction,           // вычитание
-    Multiplication,        // умножение
-    Division,              // деление
-    DivisionWithRemainder, // деление с остатком
-    // RemainderFromDivision, // остаток от деления
+    // сложение
+    Addition,
+    // вычитание
+    Subtraction,
+    // умножение
+    Multiplication,
+    // деление
+    Division,
+    // деление с остатком
+    DivisionWithRemainder,
+    // остаток от деления
+    // RemainderFromDivision,
 }
 
 impl Display for Operation {
@@ -17,40 +25,72 @@ impl Display for Operation {
             Operation::Addition => write!(f, "+"),
             Operation::Subtraction => write!(f, "-"),
             Operation::Multiplication => write!(f, "*"),
-            Operation::Division|Operation::DivisionWithRemainder => write!(f, "/"),
+            Operation::Division | Operation::DivisionWithRemainder => write!(f, "/"),
         }
+    }
+}
+
+impl Operation {
+    fn from_symbol(symbol: &str) -> Result<Self, String> {
+        match symbol {
+            "+" => Ok(Operation::Addition),
+            "-" => Ok(Operation::Subtraction),
+            "*" => Ok(Operation::Multiplication),
+            "/" => Ok(Operation::Division),
+            ":" => Ok(Operation::DivisionWithRemainder),
+            _ => Err(format!("Некорректная операция: {}", symbol)),
+        }
+    }
+
+    fn symbol(&self) -> &'static str {
+        match self {
+            Operation::Addition => "+",
+            Operation::Subtraction => "-",
+            Operation::Multiplication => "*",
+            Operation::Division => "/",
+            Operation::DivisionWithRemainder => ":",
+        }
+    }
+}
+
+impl Serialize for Operation {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.symbol())
+    }
+}
+
+impl<'de> Deserialize<'de> for Operation {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let symbol = String::deserialize(deserializer)?;
+        Operation::from_symbol(&symbol).map_err(serde::de::Error::custom)
     }
 }
 
 impl From<char> for Operation {
     fn from(c: char) -> Self {
-        match c {
-            '+' => Operation::Addition,
-            '-' => Operation::Subtraction,
-            '*' => Operation::Multiplication,
-            '/' => Operation::Division,
-            ':' => Operation::DivisionWithRemainder,
-            _ => panic!("Некорректная операция: {}", c),
-        }
+        Operation::from_symbol(&c.to_string()).unwrap()
     }
 }
 
 impl From<&str> for Operation {
     fn from(s: &str) -> Self {
-        s.chars().next().unwrap().into()
+        Operation::from_symbol(s).unwrap()
     }
 }
 
 impl Operation {
     pub fn hotkey_str(&self) -> String {
-        match self {
-            Operation::DivisionWithRemainder => ":".to_string(),
-            _ => format!("{}", self)
-        }
+        self.symbol().to_string()
     }
 
     pub fn make_exercise(&self, left: i32, right: i32) -> Exercise {
-         Exercise::new(left, *self, right)
+        Exercise::new(left, *self, right)
     }
 
     pub fn validates_operands(&self, _left: i32, right: i32) -> Result<(), String> {
@@ -77,21 +117,26 @@ impl Operation {
         }
     }
 
+    pub fn calculate_remainder(&self, left: i32, right: i32) -> Result<i32, String> {
+        self.validates_operands(left, right)?;
+
+        if matches!(self, Operation::Division | Operation::DivisionWithRemainder) {
+            return Ok(left % right);
+        }
+        Ok(0)
+    }
+
     pub fn calculate_str(&self, left: i32, right: i32) -> Result<String, String> {
         self.validates_operands(left, right)?;
 
         let result = self.calculate(left, right)?;
-        if matches!(self, Operation::Division | Operation::DivisionWithRemainder) {
-            let reminder = left % right;
-            if reminder != 0 {
-                return Ok(format!("{} (остаток {})", result, reminder));
-            }
+        let remainder = self.calculate_remainder(left, right)?;
+        if remainder != 0 {
+            return Ok(format!("{} (остаток {})", result, remainder));
         }
         Ok(format!("{}", result))
     }
-
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -112,7 +157,10 @@ mod tests {
         assert_eq!(Operation::Subtraction.calculate(5, 3).unwrap(), 2);
         assert_eq!(Operation::Multiplication.calculate(4, 6).unwrap(), 24);
         assert_eq!(Operation::Division.calculate(10, 2).unwrap(), 5);
-        assert_eq!(Operation::DivisionWithRemainder.calculate(10, 3).unwrap(), 3);
+        assert_eq!(
+            Operation::DivisionWithRemainder.calculate(10, 3).unwrap(),
+            3
+        );
     }
 
     #[test]
@@ -121,7 +169,12 @@ mod tests {
         assert_eq!(Operation::Subtraction.calculate_str(5, 3).unwrap(), "2");
         assert_eq!(Operation::Multiplication.calculate_str(4, 6).unwrap(), "24");
         assert_eq!(Operation::Division.calculate_str(10, 2).unwrap(), "5");
-        assert_eq!(Operation::DivisionWithRemainder.calculate_str(10, 3).unwrap(), "3 (остаток 1)");
+        assert_eq!(
+            Operation::DivisionWithRemainder
+                .calculate_str(10, 3)
+                .unwrap(),
+            "3 (остаток 1)"
+        );
     }
 
     #[test]
@@ -130,7 +183,9 @@ mod tests {
         assert!(Operation::Subtraction.validates_operands(5, 3).is_ok());
         assert!(Operation::Multiplication.validates_operands(4, 6).is_ok());
         assert!(Operation::Division.validates_operands(10, 2).is_ok());
-        assert!(Operation::DivisionWithRemainder.validates_operands(10, 3).is_ok());
+        assert!(Operation::DivisionWithRemainder
+            .validates_operands(10, 3)
+            .is_ok());
         assert!(Operation::Division.validates_operands(10, 0).is_err());
     }
 }
