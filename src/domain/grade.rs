@@ -21,6 +21,12 @@ impl Display for Grade {
     }
 }
 
+impl Default for Grade {
+    fn default() -> Self {
+        Grade::Five
+    }
+}
+
 impl Grade {
     pub fn from_quantity(correct_answers: usize, total_answers: usize) -> Grade {
         if total_answers == 0 {

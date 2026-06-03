@@ -28,5 +28,11 @@ pub struct Session {
 }
 
 impl Session {
-    
+    pub fn new(settings: Settings) -> Self {
+        Session {
+            settings,
+            answers: Vec::new(),
+            grade: Grade::default(),
+        }
+    }
 }
