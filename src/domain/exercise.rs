@@ -146,14 +146,6 @@ impl Exercise {
         result_min: i32,
         result_max: i32,
     ) -> Result<Exercise, String> {
-        if result_min == result_max {
-            return Err(
-                "Минимальное значение ответа не может совпадать с максимальным".to_string(),
-            );
-        }
-        if result_min > result_max {
-            return Err("Минимальное значение ответа не может быть выше максимального".to_string());
-        }
         if result_max - result_min < 50 {
             return Err(
                 "Разница межу минимальным и максимальным значением ответа не может быть меньше 50"

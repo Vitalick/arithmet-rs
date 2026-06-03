@@ -1,8 +1,7 @@
+use crate::domain::operation::Operation;
 use std::collections::HashSet;
 use std::path::Path;
-
-use crate::domain::operation::Operation;
-
+use validations::{Error, Errors, Validate};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Limits {
@@ -21,6 +20,33 @@ impl Default for Limits {
             exercise_count: 20,
             answer_time_seconds: std::time::Duration::from_secs(30),
         }
+    }
+}
+
+impl Validate<String> for Limits {
+    fn validate(&self) -> Result<(), Errors<String>> {
+        let mut errors = Errors::new();
+
+        if self.result_max - self.result_min < 50 {
+            errors.add_error(Error::new(
+                "Разница межу минимальным и максимальным значением ответа не может быть меньше 50",
+            ));
+        }
+        if self.result_min < 0 {
+            errors.add_error(Error::new("Минимальное значение не может быть меньше нуля"));
+        }
+
+        if self.exercise_count < 1 {
+            errors.add_error(Error::new("Количество упражнений должно быть больше 0"));
+        }
+        if self.answer_time_seconds.as_secs() < 1 {
+            errors.add_error(Error::new("Время на ответ должно быть как минимум 1 секунда"));
+        }
+
+        if errors.is_empty() {
+            return Ok(());
+        }
+        Err(errors)
     }
 }
 
@@ -49,6 +75,27 @@ impl Settings {
     pub fn save(&self, path: impl AsRef<Path>) -> Result<(), String> {
         let output = self.to_toml_string().map_err(|err| err.to_string())?;
         std::fs::write(path, output).map_err(|err| err.to_string())
+    }
+}
+
+impl Validate<String> for Settings {
+    fn validate(&self) -> Result<(), Errors<String>> {
+        let mut errors = Errors::new();
+        if self.player_name == "" {
+            errors.add_error(Error::new("имя игрока должно быть заполнено"))
+        }
+        if self.results_dir == "" {
+            errors.add_error(Error::new("путь к результатам должен быть заполнен"))
+        }
+
+        if self.operations.is_empty() {
+            errors.add_error(Error::new("Должна быть установлена хотя бы одна операция"))
+        }
+
+        if errors.is_empty() {
+            return Ok(());
+        }
+        Err(errors)
     }
 }
 
@@ -97,7 +144,10 @@ answer_time_seconds = "30s"
         assert_eq!(settings.limits.result_min, 100);
         assert_eq!(settings.limits.result_max, 150);
         assert_eq!(settings.limits.exercise_count, 20);
-        assert_eq!(settings.limits.answer_time_seconds, std::time::Duration::from_secs(30));
+        assert_eq!(
+            settings.limits.answer_time_seconds,
+            std::time::Duration::from_secs(30)
+        );
     }
 
     #[test]
