@@ -1,9 +1,9 @@
-use time::OffsetDateTime;
 use crate::domain::exercise::Exercise;
 use crate::domain::expression::Expression;
 use crate::domain::grade::Grade;
 use crate::domain::operation::Operation;
 use crate::domain::settings::Settings;
+use time::OffsetDateTime;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum AnswerError {
@@ -123,11 +123,7 @@ impl Session {
         if !fs::exists(&results_dir)? {
             fs::create_dir_all(&results_dir)?;
         }
-        let file_path = format!(
-            "{}/{}.json",
-            results_dir,
-            OffsetDateTime::now_utc()
-        );
+        let file_path = format!("{}/{}.json", results_dir, OffsetDateTime::now_utc());
         let file = fs::File::create(&file_path)?;
         serde_json::to_writer_pretty(file, self)?;
         Ok(())
@@ -151,6 +147,7 @@ impl Iterator for SessionExerciseIter<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use std::collections::HashSet;
 
     fn settings(exercise_count: usize) -> Settings {
@@ -172,6 +169,14 @@ mod tests {
             exercise: Exercise::new(2, Operation::Addition, 3),
             entered: Ok(5),
             time_elapsed: std::time::Duration::from_secs(1),
+        }
+    }
+
+    fn failed_answer(error: AnswerError) -> Answer {
+        Answer {
+            exercise: Exercise::new(7, Operation::DivisionWithRemainder, 3),
+            entered: Err(error),
+            time_elapsed: std::time::Duration::from_secs(2),
         }
     }
 
@@ -198,5 +203,178 @@ mod tests {
         let session = Session::new(settings(0));
 
         assert!(session.exercises().next().is_none());
+    }
+
+    #[test]
+    fn test_answer_serializes_to_expected_json() {
+        let serialized = serde_json::to_value(answer()).unwrap();
+
+        assert_eq!(
+            serialized,
+            json!({
+                "exercise": {
+                    "left": 2,
+                    "operation": "+",
+                    "right": 3,
+                },
+                "entered": {
+                    "Ok": 5,
+                },
+                "time_elapsed": "1s",
+            })
+        );
+    }
+
+    #[test]
+    fn test_answer_error_deserializes_from_json() {
+        let input = json!({
+            "exercise": {
+                "left": 7,
+                "operation": ":",
+                "right": 3,
+            },
+            "entered": {
+                "Err": "TimedOut",
+            },
+            "time_elapsed": "2s",
+        });
+
+        let deserialized: Answer = serde_json::from_value(input).unwrap();
+
+        assert_eq!(
+            deserialized.exercise,
+            Exercise::new(7, Operation::DivisionWithRemainder, 3)
+        );
+        assert!(matches!(deserialized.entered, Err(AnswerError::TimedOut)));
+        assert_eq!(deserialized.time_elapsed, std::time::Duration::from_secs(2));
+        assert!(!deserialized.is_correct());
+    }
+
+    #[test]
+    fn test_session_serialization_round_trip_preserves_fields() {
+        let session = Session {
+            settings: Settings {
+                player_name: "ученик".to_string(),
+                results_dir: "results".to_string(),
+                operations: HashSet::from([Operation::Addition, Operation::DivisionWithRemainder]),
+                limits: crate::domain::settings::Limits {
+                    result_min: 10,
+                    result_max: 100,
+                    exercise_count: 2,
+                    answer_time_seconds: std::time::Duration::from_secs(45),
+                },
+            },
+            answers: vec![answer(), failed_answer(AnswerError::Escaped)],
+            correct_answers: 1,
+            grade: Grade::Three,
+        };
+
+        let serialized = serde_json::to_string(&session).unwrap();
+        let deserialized: Session = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.settings.player_name, "ученик");
+        assert_eq!(deserialized.settings.results_dir, "results");
+        assert_eq!(
+            deserialized.settings.operations,
+            HashSet::from([Operation::Addition, Operation::DivisionWithRemainder])
+        );
+        assert_eq!(deserialized.settings.limits.result_min, 10);
+        assert_eq!(deserialized.settings.limits.result_max, 100);
+        assert_eq!(deserialized.settings.limits.exercise_count, 2);
+        assert_eq!(
+            deserialized.settings.limits.answer_time_seconds,
+            std::time::Duration::from_secs(45)
+        );
+        assert_eq!(deserialized.answers.len(), 2);
+        assert_eq!(
+            deserialized.answers[0].exercise,
+            Exercise::new(2, Operation::Addition, 3)
+        );
+        assert!(matches!(deserialized.answers[0].entered, Ok(5)));
+        assert_eq!(
+            deserialized.answers[0].time_elapsed,
+            std::time::Duration::from_secs(1)
+        );
+        assert_eq!(
+            deserialized.answers[1].exercise,
+            Exercise::new(7, Operation::DivisionWithRemainder, 3)
+        );
+        assert!(matches!(
+            deserialized.answers[1].entered,
+            Err(AnswerError::Escaped)
+        ));
+        assert_eq!(
+            deserialized.answers[1].time_elapsed,
+            std::time::Duration::from_secs(2)
+        );
+        assert_eq!(deserialized.correct_answers, 1);
+        assert!(matches!(deserialized.grade, Grade::Three));
+    }
+
+    #[test]
+    fn test_session_deserializes_saved_json_shape() {
+        let input = r#"{
+  "settings": {
+    "player_name": "test",
+    "results_dir": "results",
+    "operations": ["+", ":"],
+    "limits": {
+      "result_min": 100,
+      "result_max": 150,
+      "exercise_count": 2,
+      "answer_time_seconds": "30s"
+    }
+  },
+  "answers": [
+    {
+      "exercise": {
+        "left": 2,
+        "operation": "+",
+        "right": 3
+      },
+      "entered": {
+        "Ok": 5
+      },
+      "time_elapsed": "1s"
+    },
+    {
+      "exercise": {
+        "left": 7,
+        "operation": ":",
+        "right": 3
+      },
+      "entered": {
+        "Err": "InvalidInput"
+      },
+      "time_elapsed": "250ms"
+    }
+  ],
+  "correct_answers": 1,
+  "grade": "Three"
+}"#;
+
+        let session: Session = serde_json::from_str(input).unwrap();
+
+        assert_eq!(session.settings.player_name, "test");
+        assert_eq!(
+            session.settings.operations,
+            HashSet::from([Operation::Addition, Operation::DivisionWithRemainder])
+        );
+        assert_eq!(
+            session.settings.limits.answer_time_seconds,
+            std::time::Duration::from_secs(30)
+        );
+        assert_eq!(session.answers.len(), 2);
+        assert!(matches!(session.answers[0].entered, Ok(5)));
+        assert!(matches!(
+            session.answers[1].entered,
+            Err(AnswerError::InvalidInput)
+        ));
+        assert_eq!(
+            session.answers[1].time_elapsed,
+            std::time::Duration::from_millis(250)
+        );
+        assert_eq!(session.correct_answers, 1);
+        assert!(matches!(session.grade, Grade::Three));
     }
 }
