@@ -1,4 +1,4 @@
-use toml::map::Map;
+use std::collections::HashSet;
 use crate::domain::operation::Operation;
 
 #[derive(Debug, Clone)]
@@ -13,7 +13,7 @@ pub struct Limits {
 pub struct SettingsSnapshot {
     pub player_name: String,
     pub results_dir: String,
-    pub operations: Map<Operation, bool>,
+    pub operations: HashSet<Operation>,
     pub limits: Limits
 }
 
@@ -24,12 +24,7 @@ TOML:
 player_name = "неизвестно"
 results_dir = "results"
 
-[operations]
-addition = true
-subtraction = false
-multiplication = false
-division = false
-division_with_remainder = true
+operations = ["+", "/", ":"]
 
 [limits]
 result_min = 100
