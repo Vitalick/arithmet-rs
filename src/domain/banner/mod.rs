@@ -212,6 +212,11 @@ mod tests {
 
     #[test]
     fn replaces_unknown_characters_with_question_mark() {
-        assert_eq!(render("@"), SYMBOL_QUESTION);
+        assert_eq!(render("$"), SYMBOL_QUESTION);
+    }
+
+    #[test]
+    fn renders_at_sign() {
+        assert_eq!(render("@"), SYMBOL_AT);
     }
 }

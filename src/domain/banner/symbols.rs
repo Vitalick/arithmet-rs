@@ -178,7 +178,13 @@ pub(super) const SYMBOL_QUESTION: Glyph = [
 
 #[rustfmt::skip]
 pub(super) const SYMBOL_AT: Glyph = [
-    ""
+    " ███ ",
+    "█   █",
+    "█ ███",
+    "█ █ █",
+    "█ ███",
+    "█    ",
+    " ████",
 ];
 
 #[rustfmt::skip]

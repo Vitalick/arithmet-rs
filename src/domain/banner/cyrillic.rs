@@ -66,6 +66,7 @@ pub(super) const CYR_E: Glyph = [
     "    ",
 ];
 
+#[rustfmt::skip]
 pub(super) const CYR_YO: Glyph = [
     " █ █",
     "████",
