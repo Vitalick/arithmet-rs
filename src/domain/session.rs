@@ -17,13 +17,25 @@ pub struct Answer {
     pub exercise: Exercise,
     pub entered: Result<i32, AnswerError>,
     pub time_elapsed: u64,
-    pub is_correct: bool,
+}
+
+impl Answer {
+    pub fn is_correct(&self) -> bool {
+        match self.entered {
+            Ok(entered) => match self.exercise.compare(entered) {
+                Ok(true) => true,
+                _ => false,
+            },
+            Err(_) => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Session {
     settings: Settings,
     answers: Vec<Answer>,
+    correct_answers: usize,
     grade: Grade,
 }
 
@@ -61,7 +73,15 @@ impl Session {
         }
     }
 
+    fn recalc_grade(&mut self) {
+        self.grade = Grade::from_quantity(self.correct_answers, self.answers.len());
+    }
+
     pub fn add_answer(&mut self, answer: Answer) {
+        if answer.is_correct() {
+            self.correct_answers += 1;
+            self.recalc_grade();
+        }
         self.answers.push(answer);
     }
 
@@ -70,10 +90,6 @@ impl Session {
     }
     pub fn get_grade(&self) -> Grade {
         self.grade
-    }
-
-    pub fn correct_answers(&self) -> usize {
-        self.answers.iter().filter(|a| a.is_correct).count()
     }
 
     pub fn total_answers(&self) -> usize {
@@ -87,8 +103,6 @@ impl Session {
     pub fn is_finished(&self) -> bool {
         self.exercises_left() == 0
     }
-
-
 }
 
 impl Iterator for SessionExerciseIter<'_> {

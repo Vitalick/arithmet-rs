@@ -175,6 +175,10 @@ impl Exercise {
         self.operation.calculate(self.left, self.right)
     }
 
+    pub fn compare(&self, value: i32) -> Result<bool, String> {
+        Ok(self.expected()? == value)
+    }
+
     pub fn expected_remainder(&self) -> Result<i32, String> {
         self.operation.calculate_remainder(self.left, self.right)
     }
