@@ -53,7 +53,7 @@ impl Grade {
         Grade::One
     }
 
-    pub fn full_banner(&self) -> Vec<String> {
+    pub fn banner(&self) -> Vec<String> {
         crate::domain::banner::render(&format!("Ваша оценка {}", self.value()))
     }
 
@@ -64,16 +64,6 @@ impl Grade {
             Grade::Three => 3,
             Grade::Two => 2,
             Grade::One => 1,
-        }
-    }
-
-    pub fn banner(&self) -> [&str; 6] {
-        match self {
-            Grade::Five => ["████", "█   ", "████", "   █", "████", "    "],
-            Grade::Four => ["█  █", "█  █", "████", "   █", "   █", "    "],
-            Grade::Three => [" ██ ", "█  █", "  █ ", "█  █", " ██ ", "    "],
-            Grade::Two => [" ██", "█  █", "  █", " █", "████", "    "],
-            Grade::One => ["   █", "  ██", "   █", "   █", "   █", "    "],
         }
     }
 }
