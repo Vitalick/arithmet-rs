@@ -4,6 +4,7 @@ use crate::domain::grade::Grade;
 use crate::domain::operation::Operation;
 use crate::domain::settings::Settings;
 use time::OffsetDateTime;
+use validations::Validate;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum AnswerError {
@@ -55,12 +56,16 @@ pub struct SessionExerciseIter<'a> {
 }
 
 impl Session {
-    pub fn new(settings: Settings) -> Self {
-        Session {
-            settings,
-            answers: Vec::new(),
-            correct_answers: 0,
-            grade: Grade::default(),
+    pub fn new(settings: Settings) -> Result<Self, String> {
+        match settings.validate() {
+            Ok(_) =>
+                Ok(Session {
+                    settings,
+                    answers: Vec::new(),
+                    correct_answers: 0,
+                    grade: Grade::default(),
+                }),
+            Err(e) => Err(e.to_string()),
         }
     }
 
@@ -184,7 +189,7 @@ mod tests {
 
     #[test]
     fn test_exercises_iter_generates_until_exercise_count() {
-        let session = Session::new(settings(3));
+        let session = Session::new(settings(3)).unwrap();
         let exercises = session.exercises().collect::<Result<Vec<_>, _>>().unwrap();
 
         assert_eq!(exercises.len(), 3);
@@ -192,7 +197,7 @@ mod tests {
 
     #[test]
     fn test_exercises_iter_counts_existing_answers() {
-        let mut session = Session::new(settings(3));
+        let mut session = Session::new(settings(3)).unwrap();
         session.answers.push(answer());
 
         let exercises = session.exercises().collect::<Result<Vec<_>, _>>().unwrap();
@@ -202,7 +207,7 @@ mod tests {
 
     #[test]
     fn test_exercises_iter_stops_when_limit_is_zero() {
-        let session = Session::new(settings(0));
+        let session = Session::new(settings(0)).unwrap();
 
         assert!(session.exercises().next().is_none());
     }

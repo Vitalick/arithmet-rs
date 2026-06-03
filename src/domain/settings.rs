@@ -33,14 +33,23 @@ impl Validate<String> for Limits {
             ));
         }
         if self.result_min < 0 {
-            errors.add_error(Error::new("Минимальное значение не может быть меньше нуля"));
+            errors.add_field_error(
+                "result_min",
+                Error::new("Минимальное значение не может быть меньше нуля"),
+            );
         }
 
         if self.exercise_count < 1 {
-            errors.add_error(Error::new("Количество упражнений должно быть больше 0"));
+            errors.add_field_error(
+                "exercise_count",
+                Error::new("Количество упражнений должно быть больше 0"),
+            );
         }
         if self.answer_time_seconds.as_secs() < 1 {
-            errors.add_error(Error::new("Время на ответ должно быть как минимум 1 секунда"));
+            errors.add_field_error(
+                "answer_time_seconds",
+                Error::new("Время на ответ должно быть как минимум 1 секунда"),
+            );
         }
 
         if errors.is_empty() {
@@ -82,14 +91,27 @@ impl Validate<String> for Settings {
     fn validate(&self) -> Result<(), Errors<String>> {
         let mut errors = Errors::new();
         if self.player_name == "" {
-            errors.add_error(Error::new("имя игрока должно быть заполнено"))
+            errors.add_field_error(
+                "player_name",
+                Error::new("имя игрока должно быть заполнено"),
+            )
         }
         if self.results_dir == "" {
-            errors.add_error(Error::new("путь к результатам должен быть заполнен"))
+            errors.add_field_error(
+                "results_dir",
+                Error::new("путь к результатам должен быть заполнен"),
+            )
         }
 
         if self.operations.is_empty() {
-            errors.add_error(Error::new("Должна быть установлена хотя бы одна операция"))
+            errors.add_field_error(
+                "operations",
+                Error::new("Должна быть установлена хотя бы одна операция"),
+            )
+        }
+        match self.limits.validate() {
+            Err(err) => errors.set_field_errors("limits", err),
+            _ => (),
         }
 
         if errors.is_empty() {

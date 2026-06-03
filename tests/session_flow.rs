@@ -43,7 +43,7 @@ fn session_generates_answers_and_writes_result() {
             answer_time_seconds: Duration::from_secs(30),
         },
     };
-    let mut session = Session::new(settings);
+    let mut session = Session::new(settings).unwrap();
 
     let exercises = session.exercises().collect::<Result<Vec<_>, _>>().unwrap();
     assert_eq!(exercises.len(), 3);
