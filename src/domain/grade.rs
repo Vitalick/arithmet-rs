@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+#[derive(Debug, Clone)]
 pub enum Grade {
     Five = 5,
     Four = 4,
