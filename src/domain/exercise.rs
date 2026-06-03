@@ -480,11 +480,11 @@ mod tests {
     fn test_random_rejects_invalid_ranges() {
         assert_eq!(
             Exercise::random(Operation::Addition, 100, 100).unwrap_err(),
-            "Минимальное значение ответа не может совпадать с максимальным",
+            "Разница межу минимальным и максимальным значением ответа не может быть меньше 50",
         );
         assert_eq!(
             Exercise::random(Operation::Addition, 150, 100).unwrap_err(),
-            "Минимальное значение ответа не может быть выше максимального",
+            "Разница межу минимальным и максимальным значением ответа не может быть меньше 50",
         );
         assert_eq!(
             Exercise::random(Operation::Addition, 100, 120).unwrap_err(),

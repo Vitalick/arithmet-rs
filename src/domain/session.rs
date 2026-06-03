@@ -89,11 +89,13 @@ impl Session {
     }
 
     pub fn add_answer(&mut self, answer: Answer) {
-        if answer.is_correct() {
-            self.correct_answers += 1;
-            self.recalc_grade();
-        }
+        let is_correct = answer.is_correct();
         self.answers.push(answer);
+
+        if is_correct {
+            self.correct_answers += 1;
+        }
+        self.recalc_grade();
     }
 
     pub fn get_answers(&self) -> &Vec<Answer> {
