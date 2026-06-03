@@ -17,6 +17,8 @@ pub enum AnswerError {
 pub struct Answer {
     pub exercise: Exercise,
     pub entered: Result<i32, AnswerError>,
+
+    #[serde(with = "humantime_serde")]
     pub time_elapsed: std::time::Duration,
 }
 

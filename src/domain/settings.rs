@@ -3,11 +3,13 @@ use std::path::Path;
 
 use crate::domain::operation::Operation;
 
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Limits {
     pub result_min: i32,
     pub result_max: i32,
     pub exercise_count: usize,
+    #[serde(with = "humantime_serde")]
     pub answer_time_seconds: std::time::Duration,
 }
 
@@ -74,7 +76,7 @@ operations = ["+", "-", "*", "/", ":"]
 result_min = 100
 result_max = 150
 exercise_count = 20
-answer_time_seconds = 30s
+answer_time_seconds = "30s"
 "#;
 
     #[test]
@@ -130,7 +132,7 @@ operations = ["?"]
 result_min = 100
 result_max = 150
 exercise_count = 20
-answer_time_seconds = 30
+answer_time_seconds = "30s"
 "#;
 
         let error = Settings::from_toml_str(input).unwrap_err().to_string();
