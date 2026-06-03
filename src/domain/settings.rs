@@ -10,7 +10,7 @@ pub struct Limits {
 }
 
 #[derive(Debug, Clone)]
-pub struct SettingsSnapshot {
+pub struct Settings {
     pub player_name: String,
     pub results_dir: String,
     pub operations: HashSet<Operation>,
