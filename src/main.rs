@@ -1,3 +1,7 @@
+use arithmet::domain::banner;
+
 fn main() {
-    println!("Hello, world!");
+    for s in banner::render("Hello, world!") {
+        println!("{}", s)
+    }
 }
