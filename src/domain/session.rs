@@ -1,4 +1,5 @@
 use crate::domain::exercise::Exercise;
+use crate::domain::expression::Expression;
 use crate::domain::grade::Grade;
 use crate::domain::operation::Operation;
 use crate::domain::settings::Settings;
@@ -29,6 +30,13 @@ impl Answer {
             Err(_) => false,
         }
     }
+
+    pub fn check_expressions(&self) -> Result<[Box<dyn Expression>; 2], String> {
+        match self.entered {
+            Ok(entered) => self.exercise.check_expressions(entered),
+            Err(_) => Err("Cannot check expressions with invalid input".to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -49,6 +57,7 @@ impl Session {
         Session {
             settings,
             answers: Vec::new(),
+            correct_answers: 0,
             grade: Grade::default(),
         }
     }
@@ -143,7 +152,6 @@ mod tests {
             exercise: Exercise::new(2, Operation::Addition, 3),
             entered: Ok(5),
             time_elapsed: 1,
-            is_correct: true,
         }
     }
 
