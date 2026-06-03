@@ -3,7 +3,7 @@ use crate::domain::operation::Operation;
 use rand::random_range;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Exercise {
     pub left: i32,
     pub operation: Operation,

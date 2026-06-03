@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::fs;
 use std::path::Path;
 
 use crate::domain::operation::Operation;
@@ -9,7 +8,18 @@ pub struct Limits {
     pub result_min: i32,
     pub result_max: i32,
     pub exercise_count: usize,
-    pub answer_time_seconds: u64,
+    pub answer_time_seconds: std::time::Duration,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            result_min: 100,
+            result_max: 150,
+            exercise_count: 20,
+            answer_time_seconds: std::time::Duration::from_secs(30),
+        }
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -30,32 +40,26 @@ impl Settings {
     }
 
     pub fn load(path: impl AsRef<Path>) -> Result<Self, String> {
-        let input = fs::read_to_string(path).map_err(|err| err.to_string())?;
+        let input = std::fs::read_to_string(path).map_err(|err| err.to_string())?;
         Self::from_toml_str(&input).map_err(|err| err.to_string())
     }
 
     pub fn save(&self, path: impl AsRef<Path>) -> Result<(), String> {
         let output = self.to_toml_string().map_err(|err| err.to_string())?;
-        fs::write(path, output).map_err(|err| err.to_string())
+        std::fs::write(path, output).map_err(|err| err.to_string())
     }
 }
 
-/*
-
-TOML:
-
-player_name = "неизвестно"
-results_dir = "results"
-
-operations = ["+", "/", ":"]
-
-[limits]
-result_min = 100
-result_max = 150
-exercise_count = 20
-answer_time_seconds = 30
-
- */
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            player_name: "неизвестно".to_string(),
+            results_dir: "results".to_string(),
+            operations: HashSet::from([Operation::Addition, Operation::DivisionWithRemainder]),
+            limits: Limits::default(),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -70,7 +74,7 @@ operations = ["+", "-", "*", "/", ":"]
 result_min = 100
 result_max = 150
 exercise_count = 20
-answer_time_seconds = 30
+answer_time_seconds = 30s
 "#;
 
     #[test]
@@ -83,13 +87,15 @@ answer_time_seconds = 30
         assert!(settings.operations.contains(&Operation::Subtraction));
         assert!(settings.operations.contains(&Operation::Multiplication));
         assert!(settings.operations.contains(&Operation::Division));
-        assert!(settings
-            .operations
-            .contains(&Operation::DivisionWithRemainder));
+        assert!(
+            settings
+                .operations
+                .contains(&Operation::DivisionWithRemainder)
+        );
         assert_eq!(settings.limits.result_min, 100);
         assert_eq!(settings.limits.result_max, 150);
         assert_eq!(settings.limits.exercise_count, 20);
-        assert_eq!(settings.limits.answer_time_seconds, 30);
+        assert_eq!(settings.limits.answer_time_seconds, std::time::Duration::from_secs(30));
     }
 
     #[test]

@@ -1,11 +1,11 @@
+use time::OffsetDateTime;
 use crate::domain::exercise::Exercise;
 use crate::domain::expression::Expression;
 use crate::domain::grade::Grade;
 use crate::domain::operation::Operation;
 use crate::domain::settings::Settings;
-use rand::random_range;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum AnswerError {
     Escaped,
     TimedOut,
@@ -13,11 +13,11 @@ pub enum AnswerError {
     InvalidInput,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Answer {
     pub exercise: Exercise,
     pub entered: Result<i32, AnswerError>,
-    pub time_elapsed: u64,
+    pub time_elapsed: std::time::Duration,
 }
 
 impl Answer {
@@ -39,7 +39,7 @@ impl Answer {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Session {
     settings: Settings,
     answers: Vec<Answer>,
@@ -64,7 +64,7 @@ impl Session {
 
     fn random_operation(&self) -> Operation {
         let operations = Vec::from_iter(self.settings.operations.iter().cloned());
-        operations[random_range(0..operations.len())]
+        operations[rand::random_range(0..operations.len())]
     }
 
     fn random_exercise(&self) -> Result<Exercise, String> {
@@ -112,6 +112,24 @@ impl Session {
     pub fn is_finished(&self) -> bool {
         self.exercises_left() == 0
     }
+
+    pub fn save(&self) -> Result<(), std::io::Error> {
+        use std::fs;
+
+        let translit_name = deunicode::deunicode(&self.settings.player_name);
+        let results_dir = format!("{}/{}", self.settings.results_dir, translit_name);
+        if !fs::exists(&results_dir)? {
+            fs::create_dir_all(&results_dir)?;
+        }
+        let file_path = format!(
+            "{}/{}.json",
+            results_dir,
+            OffsetDateTime::now_utc()
+        );
+        let file = fs::File::create(&file_path)?;
+        serde_json::to_writer_pretty(file, self)?;
+        Ok(())
+    }
 }
 
 impl Iterator for SessionExerciseIter<'_> {
@@ -142,7 +160,7 @@ mod tests {
                 result_min: 100,
                 result_max: 150,
                 exercise_count,
-                answer_time_seconds: 30,
+                answer_time_seconds: std::time::Duration::from_secs(30),
             },
         }
     }
@@ -151,7 +169,7 @@ mod tests {
         Answer {
             exercise: Exercise::new(2, Operation::Addition, 3),
             entered: Ok(5),
-            time_elapsed: 1,
+            time_elapsed: std::time::Duration::from_secs(1),
         }
     }
 
