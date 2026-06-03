@@ -34,6 +34,15 @@ pub struct Answer {
 }
 
 impl Answer {
+    fn protocol_entered(&self) -> String {
+        match self.entered {
+            Ok(entered) => format!("введено {:<5}", entered),
+            Err(AnswerError::Escaped) => "нажата клавиша <Esc>".to_string(),
+            Err(AnswerError::TimedOut) => "вышло время".to_string(),
+            Err(AnswerError::SessionAborted) => "нажата клавиша <F10>".to_string(),
+            Err(AnswerError::InvalidInput) => "некорректный ввод".to_string(),
+        }
+    }
     pub fn is_correct(&self) -> bool {
         match self.entered {
             Ok(entered) => match self.exercise.compare(entered) {
@@ -313,18 +322,6 @@ impl Session {
         let worst = seconds.iter().max().copied().unwrap();
         let average = seconds.iter().sum::<u64>() / count;
         Some((best, worst, average))
-    }
-}
-
-impl Answer {
-    fn protocol_entered(&self) -> String {
-        match self.entered {
-            Ok(entered) => format!("введено {:<5}", entered),
-            Err(AnswerError::Escaped) => "нажата клавиша <Esc>".to_string(),
-            Err(AnswerError::TimedOut) => "вышло время".to_string(),
-            Err(AnswerError::SessionAborted) => "нажата клавиша <F10>".to_string(),
-            Err(AnswerError::InvalidInput) => "некорректный ввод".to_string(),
-        }
     }
 }
 
