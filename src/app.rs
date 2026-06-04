@@ -1,5 +1,3 @@
-use std::io;
-
 use color_eyre::{
     Result,
     eyre::{WrapErr, bail},

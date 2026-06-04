@@ -1,7 +1,5 @@
 pub mod app;
 
-use std::io;
-
 use color_eyre::{
     eyre::{bail, WrapErr},
     Result,
