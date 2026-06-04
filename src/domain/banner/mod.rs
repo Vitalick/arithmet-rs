@@ -4,6 +4,8 @@ pub mod symbols;
 
 use cyrillic::*;
 use latin::*;
+use ratatui::prelude::{Line, Text};
+use ratatui::widgets::Paragraph;
 use symbols::*;
 
 pub const HEIGHT: usize = 7;
@@ -41,6 +43,15 @@ pub fn render(text: &str) -> Vec<String> {
     }
 
     rows
+}
+
+pub fn render_to_paragraph(text: &str) -> Paragraph<'_> {
+    Paragraph::new(Text::from(
+        render(text)
+            .iter()
+            .map(|x| Line::from(x.to_string()))
+            .collect::<Vec<_>>(),
+    ))
 }
 
 fn append_spaces(rows: &mut [String], count: usize) {

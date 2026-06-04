@@ -1,32 +1,28 @@
+
+
+use std::io;
+
+use color_eyre::{
+    eyre::{bail, WrapErr},
+    Result,
+};
+
 use arithmet::domain::banner;
-use ratatui::text::{Line, Text};
-use ratatui::widgets::{Block, Paragraph};
-use ratatui::{DefaultTerminal, Frame};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use ratatui::{
+    DefaultTerminal, Frame,
+    buffer::Buffer,
+    layout::Rect,
+    style::Stylize,
+    symbols::border,
+    text::{Line, Text},
+    widgets::{Block, Paragraph, Widget},
+};
 
-fn main() -> color_eyre::Result<()> {
+fn main() -> Result<()> {
     color_eyre::install()?;
-    ratatui::run(app)?;
-    Ok(())
-}
-
-fn app(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
-    loop {
-        terminal.draw(render)?;
-        if crossterm::event::read()?.is_key_press() {
-            break Ok(());
-        }
-    }
-}
-
-fn render(frame: &mut Frame) {
-    let hello_world_text = banner::render("Hello, World!");
-    let text = Text::from(
-        hello_world_text
-            .iter()
-            .map(|x| Line::from(x.to_string()))
-            .collect::<Vec<_>>(),
-    );
-    let para = Paragraph::new(text);
-    frame.render_widget(para, frame.area());
-    // frame.render_widget("hello world", frame.area());
+    let mut terminal = ratatui::init();
+    let app_result = App::default().run(&mut terminal);
+    ratatui::restore();
+    app_result
 }
