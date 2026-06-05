@@ -1,23 +1,63 @@
-use color_eyre::{
-    Result,
-    eyre::{WrapErr, bail},
-};
+use std::time::Duration;
+
+use color_eyre::{eyre::WrapErr, Result};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
-use ratatui::layout::Constraint;
 use ratatui::{
-    DefaultTerminal, Frame,
     buffer::Buffer,
-    layout::{Layout, Rect},
+    layout::{Constraint, Flex, Layout, Rect},
     style::Stylize,
     symbols::border,
-    text::{Line, Text},
+    text::{Line, Span},
     widgets::{Block, Paragraph, Widget},
+    DefaultTerminal, Frame,
 };
+use validations::Validate;
 
-#[derive(Debug, Default)]
+use crate::domain::{operation::Operation, settings::Settings};
+
+const CONFIG_PATH: &str = "arithmet.toml";
+const HEADER_NAME: &str = "VIT";
+
+const OPERATION_ORDER: [Operation; 5] = [
+    Operation::Addition,
+    Operation::Subtraction,
+    Operation::Multiplication,
+    Operation::Division,
+    Operation::DivisionWithRemainder,
+];
+
+const INPUT_CURSOR: [char; 4] = ['-', '\\', '|', '/'];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ActiveField {
+    PlayerName,
+    ResultMin,
+    ResultMax,
+    ExerciseCount,
+    Complexity,
+}
+
+#[derive(Debug)]
 pub struct App {
-    counter: u8,
+    settings: Settings,
+    correct_answers: usize,
+    active_field: Option<ActiveField>,
+    input_buffer: String,
+    cursor_frame: usize,
     exit: bool,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            settings: Settings::load(CONFIG_PATH).unwrap_or_default(),
+            correct_answers: 0,
+            active_field: None,
+            input_buffer: String::new(),
+            cursor_frame: 0,
+            exit: false,
+        }
+    }
 }
 
 impl App {
@@ -26,6 +66,10 @@ impl App {
             terminal.draw(|frame| self.render_frame(frame))?;
             self.handle_events().wrap_err("handle events failed")?;
         }
+        self.settings
+            .save(CONFIG_PATH)
+            .map_err(|err| color_eyre::eyre::eyre!(err))
+            .wrap_err("save settings failed")?;
         Ok(())
     }
 
@@ -33,43 +77,159 @@ impl App {
         frame.render_widget(self, frame.area())
     }
 
-    fn exit(&mut self) -> Result<()> {
+    fn exit(&mut self) {
         self.exit = true;
-        Ok(())
     }
 
-    fn increment_counter(&mut self) -> Result<()> {
-        self.counter += 1;
-        if self.counter > 2 {
-            bail!("counter overflow");
+    fn toggle_operation(&mut self, operation: Operation) {
+        if self.settings.operations.contains(&operation) {
+            if self.settings.operations.len() > 1 {
+                self.settings.operations.remove(&operation);
+            }
+            return;
         }
-        Ok(())
+        self.settings.operations.insert(operation);
     }
 
-    fn decrement_counter(&mut self) -> Result<()> {
-        if self.counter == 0 {
-            bail!("counter is must be greater than 0.");
+    fn start_input(&mut self, field: ActiveField) {
+        self.active_field = Some(field);
+        self.input_buffer = self.field_value(field);
+    }
+
+    fn cancel_input(&mut self) {
+        self.active_field = None;
+        self.input_buffer.clear();
+    }
+
+    fn commit_input(&mut self) {
+        let Some(field) = self.active_field else {
+            return;
+        };
+        let value = self.input_buffer.trim();
+        let mut candidate = self.settings.clone();
+
+        match field {
+            ActiveField::PlayerName => {
+                if !value.is_empty() {
+                    candidate.player_name = value.to_string();
+                }
+            }
+            ActiveField::ResultMin => {
+                if let Ok(value) = value.parse() {
+                    candidate.limits.result_min = value;
+                } else {
+                    self.cancel_input();
+                    return;
+                }
+            }
+            ActiveField::ResultMax => {
+                if let Ok(value) = value.parse() {
+                    candidate.limits.result_max = value;
+                } else {
+                    self.cancel_input();
+                    return;
+                }
+            }
+            ActiveField::ExerciseCount => {
+                if let Ok(value) = value.parse() {
+                    candidate.limits.exercise_count = value;
+                } else {
+                    self.cancel_input();
+                    return;
+                }
+            }
+            ActiveField::Complexity => {
+                if let Ok(value) = value.parse::<u64>() {
+                    candidate.limits.answer_time_seconds = Duration::from_secs(value);
+                } else {
+                    self.cancel_input();
+                    return;
+                }
+            }
         }
-        self.counter -= 1;
-        Ok(())
+
+        if candidate.validate().is_ok() {
+            self.settings = candidate;
+        }
+        self.cancel_input();
     }
 
-    fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<()> {
+    fn field_value(&self, field: ActiveField) -> String {
+        match field {
+            ActiveField::PlayerName => self.settings.player_name.clone(),
+            ActiveField::ResultMin => self.settings.limits.result_min.to_string(),
+            ActiveField::ResultMax => self.settings.limits.result_max.to_string(),
+            ActiveField::ExerciseCount => self.settings.limits.exercise_count.to_string(),
+            ActiveField::Complexity => self
+                .settings
+                .limits
+                .answer_time_seconds
+                .as_secs()
+                .to_string(),
+        }
+    }
+
+    fn handle_input_key_event(&mut self, key_event: KeyEvent) -> bool {
+        if self.active_field.is_none() {
+            return false;
+        }
+
         match key_event.code {
-            KeyCode::Char('q') | KeyCode::Char('Q') => self.exit()?,
-            KeyCode::Left => self.decrement_counter()?,
-            KeyCode::Right => self.increment_counter()?,
+            KeyCode::Enter => self.commit_input(),
+            KeyCode::Esc => self.cancel_input(),
+            KeyCode::Backspace => {
+                self.input_buffer.pop();
+            }
+            KeyCode::Delete => self.input_buffer.clear(),
+            KeyCode::Char(character) => {
+                if self.active_field == Some(ActiveField::PlayerName)
+                    || character.is_ascii_digit()
+                    || (character == '-'
+                        && self.input_buffer.is_empty()
+                        && matches!(
+                            self.active_field,
+                            Some(ActiveField::ResultMin | ActiveField::ResultMax)
+                        ))
+                {
+                    self.input_buffer.push(character);
+                }
+            }
             _ => {}
         }
-        Ok(())
+        true
+    }
+
+    fn handle_key_event(&mut self, key_event: KeyEvent) {
+        if self.handle_input_key_event(key_event) {
+            return;
+        }
+
+        match key_event.code {
+            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => self.exit(),
+            KeyCode::Char('+') => self.toggle_operation(Operation::Addition),
+            KeyCode::Char('-') => self.toggle_operation(Operation::Subtraction),
+            KeyCode::Char('*') => self.toggle_operation(Operation::Multiplication),
+            KeyCode::Char('/') => self.toggle_operation(Operation::Division),
+            KeyCode::Char(':') => self.toggle_operation(Operation::DivisionWithRemainder),
+            KeyCode::Char(character) => {
+                if let Some(field) = field_hotkey(character) {
+                    self.start_input(field);
+                }
+            }
+            _ => {}
+        }
     }
 
     fn handle_events(&mut self) -> Result<()> {
-        match event::read()? {
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                self.handle_key_event(key_event)?
+        if event::poll(Duration::from_millis(120))? {
+            match event::read()? {
+                Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
+                    self.handle_key_event(key_event)
+                }
+                _ => {}
             }
-            _ => {}
+        } else if self.active_field.is_some() {
+            self.cursor_frame = (self.cursor_frame + 1) % INPUT_CURSOR.len();
         }
         Ok(())
     }
@@ -77,100 +237,326 @@ impl App {
 
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let title = Line::from(" Устный Счёт ".bold());
+        let outer = Block::bordered()
+            .border_set(border::THICK)
+            .title(Line::from("У С Т Н Ы Й   С Ч Е Т".blue().bold()).centered())
+            .title_bottom(self.instructions().centered());
 
-        let instructions = Line::from(vec![
-            " ".into(),
-            "Уменьшить".into(),
-            " ".into(),
-            "<Left>".blue().bold(),
-            " ".into(),
-            "Увеличить".into(),
-            " ".into(),
-            "<Right>".blue().bold(),
-            " ".into(),
-            "Выход".into(),
-            " ".into(),
-            "<Q> ".into(),
-            " ".into(),
-        ]);
+        let inner = outer.inner(area);
+        outer.render(area, buf);
 
-        let main_block = Block::bordered()
-            .title(title.centered())
-            .title_bottom(instructions.centered())
-            .border_set(border::THICK);
+        let [header_area, columns_area, _footer_gap] = Layout::vertical([
+            Constraint::Length(5),
+            Constraint::Fill(1),
+            Constraint::Length(2),
+        ])
+        .areas(inner);
 
-        let counter_text = Text::from(vec![Line::from(vec![
-            "Value: ".into(),
-            self.counter.to_string().yellow(),
-        ])]);
+        self.render_header(header_area, buf);
+        self.render_columns(columns_area, buf);
+    }
+}
 
-        let [top, main] = main_block
-            .inner(area)
-            .layout(&Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).spacing(1));
-        let version = Line::from(format!("версия {}", env!("CARGO_PKG_VERSION")));
-        let developer = Line::from(format!("{}", 2026));
+impl App {
+    fn instructions(&self) -> Line<'static> {
+        Line::from(vec![
+            "<+ - * / :>".blue().bold(),
+            " - действие, ".into(),
+            "<И О Д К С>".blue().bold(),
+            " - поля, ".into(),
+            "<F1>".blue().bold(),
+            " - результат, ".into(),
+            "<Esc>".blue().bold(),
+            " - выход, ".into(),
+            "<Enter>".blue().bold(),
+            " - старт".into(),
+        ])
+    }
 
-        Paragraph::new(vec![version, developer])
-            .centered()
-            .render(top, buf);
+    fn render_header(&self, area: Rect, buf: &mut Buffer) {
+        let header = Paragraph::new(vec![
+            Line::from(format!("==== версия {} ====", env!("CARGO_PKG_VERSION"))),
+            Line::from(format!("{:<12}{:>12}", HEADER_NAME, 2026)),
+        ])
+        .centered();
 
-        let [left, center, right] = main_block.inner(main).layout(
-            &Layout::horizontal([
-                Constraint::Fill(1),
-                Constraint::Fill(2),
-                Constraint::Fill(1),
-            ])
-            .spacing(1),
+        header.render(area, buf);
+    }
+
+    fn render_columns(&self, area: Rect, buf: &mut Buffer) {
+        let body = centered_rect(
+            area,
+            area.width.saturating_sub(8),
+            area.height.saturating_sub(2),
         );
 
-        Paragraph::new(counter_text).centered().render(center, buf);
+        let [left, center, right] = Layout::horizontal([
+            Constraint::Fill(1),
+            Constraint::Fill(1),
+            Constraint::Fill(1),
+        ])
+        .spacing(6)
+        .areas(body);
 
+        self.render_actions(centered_rect(left, left.width, 12), buf);
+        self.render_center_stack(center, buf);
+        self.render_settings(centered_rect(right, right.width, 13), buf);
+    }
 
-        main_block.render(area, buf);
+    fn render_actions(&self, area: Rect, buf: &mut Buffer) {
+        let block = Block::bordered()
+            .border_set(border::PLAIN)
+            .title(Line::from("Действие".bold()).centered());
+
+        let operations = OPERATION_ORDER
+            .into_iter()
+            .map(|operation| self.operation_line(operation))
+            .collect::<Vec<_>>();
+
+        Paragraph::new(operations).block(block).render(area, buf);
+    }
+
+    fn operation_line(&self, operation: Operation) -> Line<'static> {
+        let checked = if self.settings.operations.contains(&operation) {
+            "[x]"
+        } else {
+            "[ ]"
+        };
+
+        Line::from(vec![
+            format!("{}  ", checked).into(),
+            operation.symbol().blue().bold(),
+            " ".into(),
+            operation.label().to_lowercase().into(),
+        ])
+    }
+
+    fn render_center_stack(&self, area: Rect, buf: &mut Buffer) {
+        let [example, check] = Layout::vertical([Constraint::Length(7), Constraint::Length(8)])
+            .spacing(4)
+            .flex(Flex::Center)
+            .areas(area);
+
+        let example_block = Block::bordered()
+            .border_set(border::PLAIN)
+            .title(Line::from("Пример".bold()).centered())
+            .title_bottom(
+                Line::from(format!("Верных ответов: {}", self.correct_answers).bold()).centered(),
+            );
+        Paragraph::new("").block(example_block).render(example, buf);
+
+        let check_block = Block::bordered()
+            .border_set(border::PLAIN)
+            .title(Line::from("Проверка".bold()).centered());
+        let check_text = vec![
+            Line::from("a)"),
+            Line::from("b)"),
+            Line::from(""),
+            Line::from("Верный ответ:".bold()),
+        ];
+        Paragraph::new(check_text)
+            .block(check_block)
+            .render(check, buf);
+    }
+
+    fn render_settings(&self, area: Rect, buf: &mut Buffer) {
+        let block = Block::bordered()
+            .border_set(border::PLAIN)
+            .title(Line::from("Настройки".bold()).centered());
+
+        Paragraph::new(vec![
+            self.field_line("И", "мя: ", ActiveField::PlayerName),
+            Line::from(""),
+            Line::from("Величина результата".bold()),
+            Line::from(vec![
+                "О".blue().bold(),
+                "т ".into(),
+                self.field_value_span(ActiveField::ResultMin),
+                Span::raw("      "),
+                "Д".blue().bold(),
+                "о ".into(),
+                self.field_value_span(ActiveField::ResultMax),
+            ]),
+            Line::from(""),
+            self.field_line("К", "оличество примеров: ", ActiveField::ExerciseCount),
+            self.field_line("С", "ложность: ", ActiveField::Complexity),
+        ])
+        .block(block)
+        .render(area, buf);
+    }
+
+    fn field_line(
+        &self,
+        first_letter: &'static str,
+        rest: &'static str,
+        field: ActiveField,
+    ) -> Line<'static> {
+        Line::from(vec![
+            first_letter.blue().bold(),
+            rest.into(),
+            self.field_value_span(field),
+        ])
+    }
+
+    fn field_value_span(&self, field: ActiveField) -> Span<'static> {
+        let value = if self.active_field == Some(field) {
+            format!(
+                "[ {}{} ]",
+                self.input_buffer, INPUT_CURSOR[self.cursor_frame]
+            )
+        } else {
+            format!("[ {} ]", self.field_value(field))
+        };
+
+        if self.active_field == Some(field) {
+            value.blue().bold()
+        } else {
+            value.into()
+        }
+    }
+}
+
+fn field_hotkey(character: char) -> Option<ActiveField> {
+    match character {
+        'и' | 'И' | 'b' | 'B' | 'i' | 'I' => Some(ActiveField::PlayerName),
+        'о' | 'О' | 'j' | 'J' | 'o' | 'O' => Some(ActiveField::ResultMin),
+        'д' | 'Д' | 'l' | 'L' | 'd' | 'D' => Some(ActiveField::ResultMax),
+        'к' | 'К' | 'r' | 'R' | 'k' | 'K' => Some(ActiveField::ExerciseCount),
+        'с' | 'С' | 'c' | 'C' | 's' | 'S' => Some(ActiveField::Complexity),
+        _ => None,
+    }
+}
+
+fn centered_rect(area: Rect, width: u16, height: u16) -> Rect {
+    let width = width.min(area.width);
+    let height = height.min(area.height);
+    Rect {
+        x: area.x + area.width.saturating_sub(width) / 2,
+        y: area.y + area.height.saturating_sub(height) / 2,
+        width,
+        height,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ratatui::style::Style;
-    //
-    // #[test]
-    // fn render() {
-    //     let app = App::default();
-    //     let mut buf = Buffer::empty(Rect::new(0, 0, 50, 4));
-    //
-    //     app.render(buf.area, &mut buf);
-    //
-    //     let mut expected = Buffer::with_lines(vec![
-    //         "┏━━━━━━━━━━━━━━ Приложение счётчик ━━━━━━━━━━━━━━┓",
-    //         "┃                    Value: 0                    ┃",
-    //         "┃                                                ┃",
-    //         "┗━ Уменьшить <Left> Увеличить <Right> Выход <Q> ━┛",
-    //     ]);
-    //     let title_style = Style::new().bold();
-    //     let counter_style = Style::new().yellow();
-    //     let key_style = Style::new().blue().bold();
-    //     expected.set_style(Rect::new(15, 0, 20, 1), title_style);
-    //     expected.set_style(Rect::new(28, 1, 1, 1), counter_style);
-    //     expected.set_style(Rect::new(13, 3, 6, 1), key_style);
-    //     expected.set_style(Rect::new(30, 3, 7, 1), key_style);
-    //
-    //     assert_eq!(buf, expected);
-    // }
+    use std::collections::HashSet;
 
-    // #[test]
-    // fn handle_key_event() {
-    //     let mut app = App::default();
-    //     app.handle_key_event(KeyCode::Right.into());
-    //     assert_eq!(app.counter, 1);
-    //
-    //     app.handle_key_event(KeyCode::Left.into());
-    //     assert_eq!(app.counter, 0);
-    //
-    //     let mut app = App::default();
-    //     app.handle_key_event(KeyCode::Char('q').into());
-    //     assert!(app.exit);
-    // }
+    fn test_app(settings: Settings) -> App {
+        App {
+            settings,
+            correct_answers: 0,
+            active_field: None,
+            input_buffer: String::new(),
+            cursor_frame: 0,
+            exit: false,
+        }
+    }
+
+    #[test]
+    fn toggles_operation_without_leaving_empty_set() {
+        let mut app = test_app(Settings {
+            operations: HashSet::from([Operation::Addition]),
+            ..Settings::default()
+        });
+
+        app.toggle_operation(Operation::Addition);
+        assert!(app.settings.operations.contains(&Operation::Addition));
+
+        app.toggle_operation(Operation::Subtraction);
+        assert!(app.settings.operations.contains(&Operation::Subtraction));
+
+        app.toggle_operation(Operation::Addition);
+        assert!(!app.settings.operations.contains(&Operation::Addition));
+    }
+
+    #[test]
+    fn render_does_not_panic() {
+        let app = test_app(Settings::default());
+        let mut buffer = Buffer::empty(Rect::new(0, 0, 200, 60));
+
+        (&app).render(buffer.area, &mut buffer);
+    }
+
+    #[test]
+    fn field_hotkeys_work_on_russian_and_latin_layouts() {
+        assert_eq!(field_hotkey('И'), Some(ActiveField::PlayerName));
+        assert_eq!(field_hotkey('b'), Some(ActiveField::PlayerName));
+        assert_eq!(field_hotkey('i'), Some(ActiveField::PlayerName));
+        assert_eq!(field_hotkey('О'), Some(ActiveField::ResultMin));
+        assert_eq!(field_hotkey('j'), Some(ActiveField::ResultMin));
+        assert_eq!(field_hotkey('o'), Some(ActiveField::ResultMin));
+        assert_eq!(field_hotkey('Д'), Some(ActiveField::ResultMax));
+        assert_eq!(field_hotkey('l'), Some(ActiveField::ResultMax));
+        assert_eq!(field_hotkey('d'), Some(ActiveField::ResultMax));
+        assert_eq!(field_hotkey('К'), Some(ActiveField::ExerciseCount));
+        assert_eq!(field_hotkey('r'), Some(ActiveField::ExerciseCount));
+        assert_eq!(field_hotkey('k'), Some(ActiveField::ExerciseCount));
+        assert_eq!(field_hotkey('С'), Some(ActiveField::Complexity));
+        assert_eq!(field_hotkey('c'), Some(ActiveField::Complexity));
+        assert_eq!(field_hotkey('s'), Some(ActiveField::Complexity));
+    }
+
+    #[test]
+    fn commits_numeric_field_input() {
+        let mut app = test_app(Settings::default());
+
+        app.start_input(ActiveField::ExerciseCount);
+        app.input_buffer.clear();
+        app.handle_key_event(KeyCode::Char('4').into());
+        app.handle_key_event(KeyCode::Char('2').into());
+        app.handle_key_event(KeyCode::Enter.into());
+
+        assert_eq!(app.settings.limits.exercise_count, 42);
+        assert_eq!(app.active_field, None);
+    }
+
+    #[test]
+    fn escape_cancels_input_without_changing_settings() {
+        let mut app = test_app(Settings {
+            player_name: "old-name".to_string(),
+            ..Settings::default()
+        });
+
+        app.start_input(ActiveField::PlayerName);
+        app.input_buffer = "new-name".to_string();
+        app.handle_key_event(KeyCode::Esc.into());
+
+        assert_eq!(app.settings.player_name, "old-name");
+        assert_eq!(app.active_field, None);
+        assert!(app.input_buffer.is_empty());
+    }
+
+    #[test]
+    fn invalid_settings_input_restores_old_field_value() {
+        let mut app = test_app(Settings::default());
+        let old_min = app.settings.limits.result_min;
+
+        app.start_input(ActiveField::ResultMin);
+        app.input_buffer = app.settings.limits.result_max.to_string();
+        app.handle_key_event(KeyCode::Enter.into());
+
+        assert_eq!(app.settings.limits.result_min, old_min);
+        assert_eq!(app.active_field, None);
+    }
+
+    #[test]
+    fn header_does_not_use_player_name() {
+        let app = test_app(Settings {
+            player_name: "changed-player".to_string(),
+            ..Settings::default()
+        });
+        let mut buffer = Buffer::empty(Rect::new(0, 0, 80, 5));
+
+        app.render_header(buffer.area, &mut buffer);
+        let rendered = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        assert!(rendered.contains(HEADER_NAME));
+        assert!(!rendered.contains("changed-player"));
+    }
 }

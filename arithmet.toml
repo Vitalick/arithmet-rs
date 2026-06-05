@@ -1,10 +1,14 @@
-player_name = "неизвестно"
+player_name = "Виталий"
 results_dir = "results"
-
-operations = ["+", "-", "*", "/"]
+operations = [
+    "-",
+    "/",
+    "+",
+    "*",
+]
 
 [limits]
-result_min = 100
+result_min = 10
 result_max = 150
 exercise_count = 20
-answer_time_seconds = 30
+answer_time_seconds = "10s"
