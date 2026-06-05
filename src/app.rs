@@ -1,15 +1,15 @@
 use std::time::Duration;
 
-use color_eyre::{eyre::WrapErr, Result};
+use color_eyre::{Result, eyre::WrapErr};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
+    DefaultTerminal, Frame,
     buffer::Buffer,
-    layout::{Constraint, Flex, Layout, Rect},
+    layout::{Constraint, Layout, Rect},
     style::Stylize,
     symbols::border,
     text::{Line, Span},
     widgets::{Block, Paragraph, Widget},
-    DefaultTerminal, Frame,
 };
 use validations::Validate;
 
@@ -246,16 +246,13 @@ impl Widget for &App {
         let inner = outer.inner(area);
         outer.render(area, buf);
 
-        let [header_area, columns_area, _feedback_area, _footer_gap] = Layout::vertical([
-            Constraint::Length(5),
+        let [main_area, _status_area] = Layout::vertical([
             Constraint::Fill(1),
             Constraint::Length(FEEDBACK_AREA_HEIGHT),
-            Constraint::Length(2),
         ])
         .areas(inner);
 
-        self.render_header(header_area, buf);
-        self.render_columns(columns_area, buf);
+        self.render_main(main_area, buf);
     }
 }
 
@@ -285,13 +282,8 @@ impl App {
         header.render(area, buf);
     }
 
-    fn render_columns(&self, area: Rect, buf: &mut Buffer) {
-        let body = centered_rect(
-            area,
-            area.width.saturating_sub(8),
-            area.height.saturating_sub(2),
-        );
-
+    fn render_main(&self, area: Rect, buf: &mut Buffer) {
+        let body = horizontal_inset(area, 4);
         let [left, center, right] = Layout::horizontal([
             Constraint::Fill(1),
             Constraint::Fill(1),
@@ -300,9 +292,19 @@ impl App {
         .spacing(6)
         .areas(body);
 
-        self.render_actions(centered_rect(left, left.width, 12), buf);
-        self.render_center_stack(center, buf);
-        self.render_settings(centered_rect(right, right.width, 13), buf);
+        self.render_actions_column(left, buf);
+        self.render_center_column(center, buf);
+        self.render_settings_column(right, buf);
+    }
+
+    fn render_actions_column(&self, area: Rect, buf: &mut Buffer) {
+        let [_, actions] = Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Fill(1),
+        ])
+        .areas(area);
+
+        self.render_actions(actions, buf);
     }
 
     fn render_actions(&self, area: Rect, buf: &mut Buffer) {
@@ -333,11 +335,16 @@ impl App {
         ])
     }
 
-    fn render_center_stack(&self, area: Rect, buf: &mut Buffer) {
-        let [example, check] = Layout::vertical([Constraint::Length(7), Constraint::Length(8)])
-            .spacing(4)
-            .flex(Flex::Center)
-            .areas(area);
+    fn render_center_column(&self, area: Rect, buf: &mut Buffer) {
+        let [header, exercise, check] = Layout::vertical([
+            Constraint::Length(2),
+            Constraint::Fill(1),
+            Constraint::Fill(1),
+        ])
+        .spacing(1)
+        .areas(area);
+
+        self.render_header(header, buf);
 
         let example_block = Block::bordered()
             .border_set(border::PLAIN)
@@ -345,20 +352,32 @@ impl App {
             .title_bottom(
                 Line::from(format!("Верных ответов: {}", self.correct_answers).bold()).centered(),
             );
-        Paragraph::new("").block(example_block).render(example, buf);
+        Paragraph::new("")
+            .block(example_block)
+            .render(exercise, buf);
 
         let check_block = Block::bordered()
             .border_set(border::PLAIN)
-            .title(Line::from("Проверка".bold()).centered());
+            .title(Line::from("Проверка".bold()).centered())
+            .title_bottom(Line::from("Верный ответ:".bold()).centered());
         let check_text = vec![
             Line::from("a)"),
             Line::from("b)"),
             Line::from(""),
-            Line::from("Верный ответ:".bold()),
         ];
         Paragraph::new(check_text)
             .block(check_block)
             .render(check, buf);
+    }
+
+    fn render_settings_column(&self, area: Rect, buf: &mut Buffer) {
+        let [_, settings] = Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Fill(1),
+        ])
+        .areas(area);
+
+        self.render_settings(settings, buf);
     }
 
     fn render_settings(&self, area: Rect, buf: &mut Buffer) {
@@ -429,14 +448,13 @@ fn field_hotkey(character: char) -> Option<ActiveField> {
     }
 }
 
-fn centered_rect(area: Rect, width: u16, height: u16) -> Rect {
-    let width = width.min(area.width);
-    let height = height.min(area.height);
+fn horizontal_inset(area: Rect, inset: u16) -> Rect {
+    let inset = inset.min(area.width / 2);
     Rect {
-        x: area.x + area.width.saturating_sub(width) / 2,
-        y: area.y + area.height.saturating_sub(height) / 2,
-        width,
-        height,
+        x: area.x + inset,
+        y: area.y,
+        width: area.width.saturating_sub(inset * 2),
+        height: area.height,
     }
 }
 

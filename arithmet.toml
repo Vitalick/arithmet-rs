@@ -3,8 +3,8 @@ results_dir = "results"
 operations = [
     "-",
     "/",
-    "+",
     "*",
+    "+",
 ]
 
 [limits]
