@@ -17,6 +17,7 @@ use crate::domain::{operation::Operation, settings::Settings};
 
 const CONFIG_PATH: &str = "arithmet.toml";
 const HEADER_NAME: &str = "VIT";
+const FEEDBACK_AREA_HEIGHT: u16 = 10;
 
 const OPERATION_ORDER: [Operation; 5] = [
     Operation::Addition,
@@ -245,9 +246,10 @@ impl Widget for &App {
         let inner = outer.inner(area);
         outer.render(area, buf);
 
-        let [header_area, columns_area, _footer_gap] = Layout::vertical([
+        let [header_area, columns_area, _feedback_area, _footer_gap] = Layout::vertical([
             Constraint::Length(5),
             Constraint::Fill(1),
+            Constraint::Length(FEEDBACK_AREA_HEIGHT),
             Constraint::Length(2),
         ])
         .areas(inner);
