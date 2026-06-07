@@ -63,8 +63,9 @@ impl Answer {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Session {
+    settings: Settings,
     answers: Vec<Answer>,
-    iterator: SessionExerciseIter,
+    // iterator: SessionExerciseIter,
     correct_answers: usize,
     grade: Grade,
 }
@@ -73,24 +74,36 @@ impl Session {
     pub fn new(settings: Settings) -> Result<Self, String> {
         match settings.validate() {
             Ok(_) => Ok(Session {
+                settings,
                 answers: Vec::new(),
                 correct_answers: 0,
-                iterator: SessionExerciseIter::new(settings),
+                // iterator: SessionExerciseIter::new(settings),
                 grade: Grade::default(),
             }),
             Err(e) => Err(e.to_string()),
         }
     }
 
-    pub fn exercises(&self) -> SessionExerciseIter {
-        self.iterator.clone()
+    pub fn have_next(&self) -> bool {
+        self.answers.len() < self.settings.limits.exercise_count
+    }
+
+    pub fn next(&self) -> Result<Exercise, String> {
+        if !self.have_next() {
+            return Err("Достигнут максимум количества упражнений".to_string());
+        }
+        self.settings.random_exercise()
     }
 
     fn recalc_grade(&mut self) {
         self.grade = Grade::from_quantity(self.correct_answers, self.answers.len());
     }
 
-    pub fn add_answer(&mut self, answer: Answer) {
+    pub fn add_answer(&mut self, answer: Answer) -> Result<(), String> {
+        if !self.have_next() {
+            return Err("Достигнут максимум количества ответов".to_string());
+        }
+
         let is_correct = answer.is_correct();
         self.answers.push(answer);
 
@@ -98,6 +111,7 @@ impl Session {
             self.correct_answers += 1;
         }
         self.recalc_grade();
+        Ok(())
     }
 
     pub fn get_answers(&self) -> &Vec<Answer> {
@@ -112,7 +126,7 @@ impl Session {
     }
 
     pub fn exercises_left(&self) -> usize {
-        self.iterator.settings.limits.exercise_count - self.answers.len()
+        self.settings.limits.exercise_count - self.answers.len()
     }
 
     pub fn is_finished(&self) -> bool {
@@ -131,8 +145,8 @@ impl Session {
     }
 
     fn results_dir(&self) -> PathBuf {
-        let translit_name = deunicode::deunicode(&self.iterator.settings.player_name);
-        Path::new(&self.iterator.settings.results_dir).join(translit_name)
+        let translit_name = deunicode::deunicode(&self.settings.player_name);
+        Path::new(&self.settings.results_dir).join(translit_name)
     }
 
     fn save_json(&self, result_path: &Path) -> Result<(), std::io::Error> {
@@ -167,7 +181,7 @@ impl Session {
         let _ = writeln!(
             output,
             "Имя: {}     дата: {:2}.{:02}.{}  время: {:2}:{:02}:{:02}",
-            self.iterator.settings.player_name,
+            self.settings.player_name,
             saved_at.day(),
             u8::from(saved_at.month()),
             saved_at.year(),
@@ -187,10 +201,10 @@ impl Session {
         let _ = writeln!(
             output,
             "Количество: {},  пределы: от {} до {},  сложность: {}",
-            self.iterator.settings.limits.exercise_count,
-            self.iterator.settings.limits.result_min,
-            self.iterator.settings.limits.result_max,
-            self.iterator.settings.limits.answer_time_seconds.as_secs()
+            self.settings.limits.exercise_count,
+            self.settings.limits.result_min,
+            self.settings.limits.result_max,
+            self.settings.limits.answer_time_seconds.as_secs()
         );
         let _ = writeln!(
             output,
@@ -264,7 +278,7 @@ impl Session {
         PROTOCOL_OPERATION_ORDER
             .iter()
             .copied()
-            .filter(|operation| self.iterator.settings.operations.contains(operation))
+            .filter(|operation| self.settings.operations.contains(operation))
             .collect()
     }
 
@@ -301,34 +315,6 @@ impl Session {
         let worst = seconds.iter().max().copied().unwrap();
         let average = seconds.iter().sum::<u64>() / count;
         Some((best, worst, average))
-    }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SessionExerciseIter {
-    settings: Settings,
-    generated: usize,
-}
-
-impl SessionExerciseIter {
-    pub fn new(settings: Settings) -> Self {
-        Self {
-            settings,
-            generated: 0,
-        }
-    }
-}
-impl Iterator for SessionExerciseIter {
-    type Item = Result<Exercise, String>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let answered_or_generated = self.generated;
-        if answered_or_generated >= self.settings.limits.exercise_count {
-            return None;
-        }
-
-        self.generated += 1;
-        Some(self.settings.random_exercise())
     }
 }
 
@@ -379,7 +365,7 @@ mod tests {
     #[test]
     fn test_exercises_iter_counts_existing_answers() {
         let mut session = Session::new(settings(3)).unwrap();
-        session.answers.push(answer());
+        session.add_answer(answer());
 
         let exercises = session.exercises().collect::<Result<Vec<_>, _>>().unwrap();
 
