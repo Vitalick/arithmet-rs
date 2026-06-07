@@ -94,9 +94,9 @@ impl App {
     ) -> Result<()> {
         self.start_game().unwrap();
         while !self.exit && !shutdown_requested.load(Ordering::Relaxed) {
+            self.update_status();
             terminal.draw(|frame| self.render_frame(frame))?;
             self.handle_events().wrap_err("handle events failed")?;
-            self.update_status();
         }
         self.settings
             .save(CONFIG_PATH)
