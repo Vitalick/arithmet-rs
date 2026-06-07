@@ -40,7 +40,7 @@ fn session_generates_answers_and_writes_result() {
             result_min: 100,
             result_max: 150,
             exercise_count: 3,
-            answer_time_seconds: Duration::from_secs(30),
+            answer_time: Duration::from_secs(30),
         },
     };
     let mut session = Session::new(settings).unwrap();

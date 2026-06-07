@@ -5,6 +5,7 @@ use crate::domain::operation::Operation;
 use crate::domain::settings::Settings;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 use time::OffsetDateTime;
 use validations::Validate;
 
@@ -60,10 +61,24 @@ impl Answer {
         }
     }
 }
+#[derive(Debug)]
+pub struct ExerciseWithStartTime {
+    pub exercise: Exercise,
+    pub start_time: Instant,
+}
+
+impl ExerciseWithStartTime {
+    pub fn new(exercise: Exercise) -> Self {
+        Self {
+            exercise,
+            start_time: Instant::now(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Session {
-    settings: Settings,
+    pub settings: Settings,
     answers: Vec<Answer>,
     correct_answers: usize,
     grade: Grade,
@@ -86,11 +101,11 @@ impl Session {
         self.answers.len() < self.settings.limits.exercise_count
     }
 
-    pub fn next(&self) -> Result<Exercise, String> {
+    pub fn next(&self) -> Result<ExerciseWithStartTime, String> {
         if !self.have_next() {
             return Err("Достигнут максимум количества упражнений".to_string());
         }
-        self.settings.random_exercise()
+        Ok(ExerciseWithStartTime::new(self.settings.random_exercise()?))
     }
 
     fn recalc_grade(&mut self) {
@@ -202,7 +217,7 @@ impl Session {
             self.settings.limits.exercise_count,
             self.settings.limits.result_min,
             self.settings.limits.result_max,
-            self.settings.limits.answer_time_seconds.as_secs()
+            self.settings.limits.answer_time.as_secs()
         );
         let _ = writeln!(
             output,
@@ -331,7 +346,7 @@ mod tests {
                 result_min: 100,
                 result_max: 150,
                 exercise_count,
-                answer_time_seconds: std::time::Duration::from_secs(30),
+                answer_time: std::time::Duration::from_secs(30),
             },
         }
     }
@@ -357,7 +372,7 @@ mod tests {
         let session = Session::new(settings(3)).unwrap();
         let exercise = session.next().unwrap();
 
-        assert_eq!(exercise.operation, Operation::Addition);
+        assert_eq!(exercise.exercise.operation, Operation::Addition);
     }
 
     #[test]
@@ -439,7 +454,7 @@ mod tests {
                     result_min: 10,
                     result_max: 100,
                     exercise_count: 2,
-                    answer_time_seconds: std::time::Duration::from_secs(45),
+                    answer_time: std::time::Duration::from_secs(45),
                 },
             },
             answers: vec![answer(), failed_answer(AnswerError::Escaped)],
@@ -460,7 +475,7 @@ mod tests {
         assert_eq!(deserialized.settings.limits.result_max, 100);
         assert_eq!(deserialized.settings.limits.exercise_count, 2);
         assert_eq!(
-            deserialized.settings.limits.answer_time_seconds,
+            deserialized.settings.limits.answer_time,
             std::time::Duration::from_secs(45)
         );
         assert_eq!(deserialized.answers.len(), 2);
@@ -500,7 +515,7 @@ mod tests {
       "result_min": 100,
       "result_max": 150,
       "exercise_count": 2,
-      "answer_time_seconds": "30s"
+      "answer_time": "30s"
     }
   },
   "answers": [
@@ -539,7 +554,7 @@ mod tests {
             HashSet::from([Operation::Addition, Operation::DivisionWithRemainder])
         );
         assert_eq!(
-            session.settings.limits.answer_time_seconds,
+            session.settings.limits.answer_time,
             std::time::Duration::from_secs(30)
         );
         assert_eq!(session.answers.len(), 2);

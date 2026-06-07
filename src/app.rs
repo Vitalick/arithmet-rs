@@ -1,14 +1,7 @@
-use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-    time::Duration,
-};
-
 use color_eyre::{Result, eyre::WrapErr};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use ratatui::widgets::Borders;
+use ratatui::style::{Modifier, Style};
+use ratatui::widgets::{Borders, Gauge};
 use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
@@ -18,10 +11,19 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Paragraph, Widget},
 };
+use std::time::Instant;
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 use validations::Validate;
 
-use crate::domain::{banner, operation::Operation, settings::Settings};
-use crate::domain::session::{Session};
+use crate::domain::exercise::Exercise;
+use crate::domain::session::{ExerciseWithStartTime, Session};
+use crate::domain::{banner, exercise, operation::Operation, settings::Settings};
 
 const CONFIG_PATH: &str = "arithmet.toml";
 const HEADER_NAME: &str = "VIT";
@@ -51,6 +53,7 @@ enum ActiveField {
 pub struct App {
     settings: Settings,
     session: Option<Session>,
+    exercise_now: Option<ExerciseWithStartTime>,
     correct_answers: usize,
     active_field: Option<ActiveField>,
     input_buffer: String,
@@ -65,6 +68,7 @@ impl Default for App {
             session: None,
             correct_answers: 0,
             active_field: None,
+            exercise_now: None,
             input_buffer: String::new(),
             cursor_frame: 0,
             exit: false,
@@ -156,7 +160,7 @@ impl App {
             }
             ActiveField::Complexity => {
                 if let Ok(value) = value.parse::<u64>() {
-                    candidate.limits.answer_time_seconds = Duration::from_secs(value);
+                    candidate.limits.answer_time = Duration::from_secs(value);
                 } else {
                     self.cancel_input();
                     return;
@@ -176,12 +180,7 @@ impl App {
             ActiveField::ResultMin => self.settings.limits.result_min.to_string(),
             ActiveField::ResultMax => self.settings.limits.result_max.to_string(),
             ActiveField::ExerciseCount => self.settings.limits.exercise_count.to_string(),
-            ActiveField::Complexity => self
-                .settings
-                .limits
-                .answer_time_seconds
-                .as_secs()
-                .to_string(),
+            ActiveField::Complexity => self.settings.limits.answer_time.as_secs().to_string(),
         }
     }
 
@@ -395,6 +394,36 @@ impl App {
 
         banner_paragraph.centered().render(area, buf);
     }
+    fn render_progress(&self, frame: &mut Frame, area: Rect) {
+        if self.exercise_now.is_none() {
+            return;
+        }
+        if self.session.is_none() {
+            return;
+        }
+        let session = self.session.as_ref().unwrap();
+        let exercise_now = self.exercise_now.as_ref().unwrap();
+        let time_elapsed = exercise_now.start_time.elapsed();
+        let time_left = session.settings.limits.answer_time - time_elapsed;
+        if time_left <= Duration::ZERO {
+            let gauge = Gauge::default()
+                .style(Modifier::BOLD)
+                .gauge_style(Style::new().red().on_black())
+                .label("Время истекло")
+                .percent(100);
+            frame.render_widget(gauge, area);
+            return;
+        }
+        let gauge = Gauge::default()
+            .style(Modifier::BOLD)
+            .gauge_style(Style::new().blue().on_black())
+            .label(format!("Осталось {:?} сек.", time_left.as_secs()))
+            .percent(
+                100 - (time_elapsed.as_secs() * 100 / session.settings.limits.answer_time.as_secs())
+                    as u16,
+            );
+        frame.render_widget(gauge, area);
+    }
 
     fn render_settings_column(&self, area: Rect, buf: &mut Buffer) {
         let [_, settings] =
@@ -497,6 +526,7 @@ mod tests {
             correct_answers: 0,
             active_field: None,
             session: None,
+            exercise_now: None,
             input_buffer: String::new(),
             cursor_frame: 0,
             exit: false,

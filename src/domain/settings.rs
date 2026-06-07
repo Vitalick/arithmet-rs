@@ -10,7 +10,7 @@ pub struct Limits {
     pub result_max: i32,
     pub exercise_count: usize,
     #[serde(with = "humantime_serde")]
-    pub answer_time_seconds: std::time::Duration,
+    pub answer_time: std::time::Duration,
 }
 
 impl Default for Limits {
@@ -19,7 +19,7 @@ impl Default for Limits {
             result_min: 100,
             result_max: 150,
             exercise_count: 20,
-            answer_time_seconds: std::time::Duration::from_secs(30),
+            answer_time: std::time::Duration::from_secs(30),
         }
     }
 }
@@ -46,9 +46,9 @@ impl Validate<String> for Limits {
                 Error::new("Количество упражнений должно быть больше 0"),
             );
         }
-        if self.answer_time_seconds.as_secs() < 1 {
+        if self.answer_time.as_secs() < 1 {
             errors.add_field_error(
-                "answer_time_seconds",
+                "answer_time",
                 Error::new("Время на ответ должно быть как минимум 1 секунда"),
             );
         }
@@ -159,7 +159,7 @@ operations = ["+", "-", "*", "/", ":"]
 result_min = 100
 result_max = 150
 exercise_count = 20
-answer_time_seconds = "30s"
+answer_time = "30s"
 "#;
 
     #[test]
@@ -181,7 +181,7 @@ answer_time_seconds = "30s"
         assert_eq!(settings.limits.result_max, 150);
         assert_eq!(settings.limits.exercise_count, 20);
         assert_eq!(
-            settings.limits.answer_time_seconds,
+            settings.limits.answer_time,
             std::time::Duration::from_secs(30)
         );
     }
@@ -202,8 +202,8 @@ answer_time_seconds = "30s"
             parsed_again.limits.exercise_count
         );
         assert_eq!(
-            settings.limits.answer_time_seconds,
-            parsed_again.limits.answer_time_seconds
+            settings.limits.answer_time,
+            parsed_again.limits.answer_time
         );
     }
 
@@ -218,7 +218,7 @@ operations = ["?"]
 result_min = 100
 result_max = 150
 exercise_count = 20
-answer_time_seconds = "30s"
+answer_time = "30s"
 "#;
 
         let error = Settings::from_toml_str(input).unwrap_err().to_string();
