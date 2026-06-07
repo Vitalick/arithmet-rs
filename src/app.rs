@@ -48,9 +48,9 @@ enum ActiveField {
 }
 
 #[derive(Debug)]
-pub struct App<'a> {
+pub struct App {
     settings: Settings,
-    session: Option<&'a mut Session>,
+    session: Option<Session>,
     correct_answers: usize,
     active_field: Option<ActiveField>,
     input_buffer: String,
@@ -58,7 +58,7 @@ pub struct App<'a> {
     exit: bool,
 }
 
-impl Default for App<'_> {
+impl Default for App {
     fn default() -> Self {
         Self {
             settings: Settings::load(CONFIG_PATH).unwrap_or_default(),
@@ -72,7 +72,7 @@ impl Default for App<'_> {
     }
 }
 
-impl App<'static> {
+impl App {
     pub fn run(
         &mut self,
         terminal: &mut DefaultTerminal,
@@ -256,7 +256,7 @@ impl App<'static> {
     }
 }
 
-impl Widget for &App<'static> {
+impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let outer = Block::bordered()
             .border_set(border::THICK)
@@ -275,7 +275,7 @@ impl Widget for &App<'static> {
     }
 }
 
-impl App<'static> {
+impl App {
     fn instructions(&self) -> Line<'static> {
         Line::from(vec![
             "<+ - * / :>".blue().bold(),
@@ -491,13 +491,12 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
 
-    fn test_app(settings: Settings) -> App<'static> {
+    fn test_app(settings: Settings) -> App {
         App {
             settings,
             correct_answers: 0,
             active_field: None,
             session: None,
-            session_exercise_iter: None,
             input_buffer: String::new(),
             cursor_frame: 0,
             exit: false,

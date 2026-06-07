@@ -62,11 +62,9 @@ impl Answer {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Session<'a> {
-    settings: &'a Settings,
+pub struct Session {
     answers: Vec<Answer>,
-    #[serde(skip)]
-    iterator: SessionExerciseIter<'a>,
+    iterator: SessionExerciseIter,
     correct_answers: usize,
     grade: Grade,
 }
@@ -75,24 +73,17 @@ impl Session {
     pub fn new(settings: Settings) -> Result<Self, String> {
         match settings.validate() {
             Ok(_) => Ok(Session {
-                & settings,
                 answers: Vec::new(),
                 correct_answers: 0,
-                iterator: SessionExerciseIter {
-                    settings: settings,
-                    generated: 0,
-                },
+                iterator: SessionExerciseIter::new(settings),
                 grade: Grade::default(),
             }),
             Err(e) => Err(e.to_string()),
         }
     }
 
-    pub fn exercises(&self) -> SessionExerciseIter<'_> {
-        SessionExerciseIter {
-            session: self,
-            generated: 0,
-        }
+    pub fn exercises(&self) -> SessionExerciseIter {
+        self.iterator.clone()
     }
 
     fn recalc_grade(&mut self) {
@@ -121,7 +112,7 @@ impl Session {
     }
 
     pub fn exercises_left(&self) -> usize {
-        self.settings.limits.exercise_count - self.answers.len()
+        self.iterator.settings.limits.exercise_count - self.answers.len()
     }
 
     pub fn is_finished(&self) -> bool {
@@ -140,8 +131,8 @@ impl Session {
     }
 
     fn results_dir(&self) -> PathBuf {
-        let translit_name = deunicode::deunicode(&self.settings.player_name);
-        Path::new(&self.settings.results_dir).join(translit_name)
+        let translit_name = deunicode::deunicode(&self.iterator.settings.player_name);
+        Path::new(&self.iterator.settings.results_dir).join(translit_name)
     }
 
     fn save_json(&self, result_path: &Path) -> Result<(), std::io::Error> {
@@ -176,7 +167,7 @@ impl Session {
         let _ = writeln!(
             output,
             "Имя: {}     дата: {:2}.{:02}.{}  время: {:2}:{:02}:{:02}",
-            self.settings.player_name,
+            self.iterator.settings.player_name,
             saved_at.day(),
             u8::from(saved_at.month()),
             saved_at.year(),
@@ -196,10 +187,10 @@ impl Session {
         let _ = writeln!(
             output,
             "Количество: {},  пределы: от {} до {},  сложность: {}",
-            self.settings.limits.exercise_count,
-            self.settings.limits.result_min,
-            self.settings.limits.result_max,
-            self.settings.limits.answer_time_seconds.as_secs()
+            self.iterator.settings.limits.exercise_count,
+            self.iterator.settings.limits.result_min,
+            self.iterator.settings.limits.result_max,
+            self.iterator.settings.limits.answer_time_seconds.as_secs()
         );
         let _ = writeln!(
             output,
@@ -273,7 +264,7 @@ impl Session {
         PROTOCOL_OPERATION_ORDER
             .iter()
             .copied()
-            .filter(|operation| self.settings.operations.contains(operation))
+            .filter(|operation| self.iterator.settings.operations.contains(operation))
             .collect()
     }
 
@@ -313,21 +304,21 @@ impl Session {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct SessionExerciseIter<'a> {
-    settings: &'a Settings,
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SessionExerciseIter {
+    settings: Settings,
     generated: usize,
 }
 
-impl SessionExerciseIter<'_> {
-    pub fn new(settings: &Settings) -> Self {
+impl SessionExerciseIter {
+    pub fn new(settings: Settings) -> Self {
         Self {
             settings,
             generated: 0,
         }
     }
 }
-impl Iterator for SessionExerciseIter<'_> {
+impl Iterator for SessionExerciseIter {
     type Item = Result<Exercise, String>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -448,7 +439,7 @@ mod tests {
     #[test]
     fn test_session_serialization_round_trip_preserves_fields() {
         let session = Session {
-            settings: Settings {
+            iterator: SessionExerciseIter::new(Settings {
                 player_name: "ученик".to_string(),
                 results_dir: "results".to_string(),
                 operations: HashSet::from([Operation::Addition, Operation::DivisionWithRemainder]),
@@ -458,7 +449,7 @@ mod tests {
                     exercise_count: 2,
                     answer_time_seconds: std::time::Duration::from_secs(45),
                 },
-            },
+            }),
             answers: vec![answer(), failed_answer(AnswerError::Escaped)],
             correct_answers: 1,
             grade: Grade::Three,
@@ -467,17 +458,17 @@ mod tests {
         let serialized = serde_json::to_string(&session).unwrap();
         let deserialized: Session = serde_json::from_str(&serialized).unwrap();
 
-        assert_eq!(deserialized.settings.player_name, "ученик");
-        assert_eq!(deserialized.settings.results_dir, "results");
+        assert_eq!(deserialized.iterator.settings.player_name, "ученик");
+        assert_eq!(deserialized.iterator.settings.results_dir, "results");
         assert_eq!(
-            deserialized.settings.operations,
+            deserialized.iterator.settings.operations,
             HashSet::from([Operation::Addition, Operation::DivisionWithRemainder])
         );
-        assert_eq!(deserialized.settings.limits.result_min, 10);
-        assert_eq!(deserialized.settings.limits.result_max, 100);
-        assert_eq!(deserialized.settings.limits.exercise_count, 2);
+        assert_eq!(deserialized.iterator.settings.limits.result_min, 10);
+        assert_eq!(deserialized.iterator.settings.limits.result_max, 100);
+        assert_eq!(deserialized.iterator.settings.limits.exercise_count, 2);
         assert_eq!(
-            deserialized.settings.limits.answer_time_seconds,
+            deserialized.iterator.settings.limits.answer_time_seconds,
             std::time::Duration::from_secs(45)
         );
         assert_eq!(deserialized.answers.len(), 2);
@@ -550,13 +541,13 @@ mod tests {
 
         let session: Session = serde_json::from_str(input).unwrap();
 
-        assert_eq!(session.settings.player_name, "test");
+        assert_eq!(session.iterator.settings.player_name, "test");
         assert_eq!(
-            session.settings.operations,
+            session.iterator.settings.operations,
             HashSet::from([Operation::Addition, Operation::DivisionWithRemainder])
         );
         assert_eq!(
-            session.settings.limits.answer_time_seconds,
+            session.iterator.settings.limits.answer_time_seconds,
             std::time::Duration::from_secs(30)
         );
         assert_eq!(session.answers.len(), 2);
