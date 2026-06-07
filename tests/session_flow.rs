@@ -47,9 +47,9 @@ fn session_generates_answers_and_writes_result() {
 
     while session.have_next() {
         let exercise = session.next().unwrap();
-        let expected = exercise.expected().unwrap();
+        let expected = exercise.exercise.expected().unwrap();
         session.add_answer(Answer {
-            exercise,
+            exercise: exercise.exercise,
             entered: Ok(expected),
             time_elapsed: Duration::from_secs(1),
         })

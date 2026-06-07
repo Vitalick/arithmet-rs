@@ -44,6 +44,22 @@ impl Answer {
             Err(AnswerError::InvalidInput) => "некорректный ввод".to_string(),
         }
     }
+
+    pub fn banner(&self) -> String {
+        match self.entered {
+            Ok(entered) => {
+                if self.is_correct() {
+                    "Молодец!".to_string()
+                } else {
+                    "Неверно...".to_string()
+                }
+            },
+            Err(AnswerError::Escaped | AnswerError::SessionAborted) => "Игра прервана".to_string(),
+            Err(AnswerError::TimedOut) => "Время вышло!".to_string(),
+            Err(AnswerError::InvalidInput) => "Неверно :(".to_string(),
+        }
+    }
+
     pub fn is_correct(&self) -> bool {
         match self.entered {
             Ok(entered) => match self.exercise.compare(entered) {
@@ -136,6 +152,17 @@ impl Session {
 
     pub fn total_answers(&self) -> usize {
         self.answers.len()
+    }
+
+    pub fn last_answer_banner(&self) -> String {
+        if self.answers.is_empty() {
+            return String::default();
+        }
+        let answer = self.answers.last();
+        if answer.is_none() {
+            return String::default();
+        }
+        answer.unwrap().banner()
     }
 
     pub fn exercises_left(&self) -> usize {

@@ -49,8 +49,17 @@ enum ActiveField {
     Complexity,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Status {
+    Welcome,
+    AwaitingAnswer,
+    AwaitingGameContinue,
+    GameFinished,
+}
+
 #[derive(Debug)]
 pub struct App {
+    status: Status,
     settings: Settings,
     session: Option<Session>,
     exercise_now: Option<ExerciseWithStartTime>,
@@ -64,6 +73,7 @@ pub struct App {
 impl Default for App {
     fn default() -> Self {
         Self {
+            status: Status::Welcome,
             settings: Settings::load(CONFIG_PATH).unwrap_or_default(),
             session: None,
             correct_answers: 0,
@@ -82,14 +92,52 @@ impl App {
         terminal: &mut DefaultTerminal,
         shutdown_requested: Arc<AtomicBool>,
     ) -> Result<()> {
+        self.start_game().unwrap();
         while !self.exit && !shutdown_requested.load(Ordering::Relaxed) {
             terminal.draw(|frame| self.render_frame(frame))?;
             self.handle_events().wrap_err("handle events failed")?;
+            self.update_status();
         }
         self.settings
             .save(CONFIG_PATH)
             .map_err(|err| color_eyre::eyre::eyre!(err))
             .wrap_err("save settings failed")?;
+        Ok(())
+    }
+
+    fn start_game(&mut self) -> Result<(), String> {
+        self.session = Some(Session::new(self.settings.clone())?);
+        self.game_step()?;
+        Ok(())
+    }
+
+    fn update_status(&mut self) {
+        if self.session.is_none() {
+            self.status = Status::Welcome;
+            return;
+        }
+        let session = self.session.as_ref().unwrap();
+        if session.is_finished() {
+            self.status = Status::GameFinished;
+            return;
+        }
+        if self.exercise_now.is_none() {
+            self.status = Status::AwaitingGameContinue;
+            return;
+        }
+        self.status = Status::AwaitingAnswer;
+    }
+
+    fn game_step(&mut self) -> Result<(), String> {
+        match self.status {
+            Status::Welcome | Status::GameFinished => {}
+            _ => {
+                let session = self.session.as_mut().unwrap();
+                if session.have_next() {
+                    self.exercise_now = Some(session.next()?);
+                }
+            }
+        }
         Ok(())
     }
 
@@ -388,41 +436,66 @@ impl App {
     }
 
     fn render_status(&self, area: Rect, buf: &mut Buffer) {
-        let banner_text = "Добро пожаловать!";
+        let [_, banner, _, progress] = Layout::vertical([
+            Constraint::Fill(1),
+            Constraint::Length(7),
+            Constraint::Fill(1),
+            Constraint::Length(2),
+        ])
+        .spacing(1)
+        .areas(area);
 
-        let banner_paragraph = banner::render_to_paragraph(banner_text);
+        self.render_banner(banner, buf);
+        self.render_progress(progress, buf);
+    }
+
+    fn render_banner(&self, area: Rect, buf: &mut Buffer) {
+        let banner_text = match self.status {
+            Status::Welcome => "Добро пожаловать!".to_string(),
+            Status::AwaitingGameContinue => self.session.as_ref().unwrap().last_answer_banner(),
+            Status::GameFinished => {
+                format!(
+                    "Ваша оценка: {}",
+                    self.session.as_ref().unwrap().get_grade()
+                )
+            }
+            _ => String::default(),
+        };
+        if banner_text.is_empty() {
+            return;
+        }
+
+        let banner_paragraph = banner::render_to_paragraph(banner_text.as_str());
 
         banner_paragraph.centered().render(area, buf);
     }
-    fn render_progress(&self, frame: &mut Frame, area: Rect) {
-        if self.exercise_now.is_none() {
-            return;
-        }
-        if self.session.is_none() {
-            return;
+
+    fn render_progress(&self, area: Rect, buf: &mut Buffer) {
+        match self.status {
+            Status::Welcome | Status::GameFinished => {return},
+            _ => {}
         }
         let session = self.session.as_ref().unwrap();
         let exercise_now = self.exercise_now.as_ref().unwrap();
         let time_elapsed = exercise_now.start_time.elapsed();
         let time_left = session.settings.limits.answer_time - time_elapsed;
         if time_left <= Duration::ZERO {
-            let gauge = Gauge::default()
+            Gauge::default()
                 .style(Modifier::BOLD)
                 .gauge_style(Style::new().red().on_black())
-                .label("Время истекло")
-                .percent(100);
-            frame.render_widget(gauge, area);
+                .percent(100)
+                .render(area, buf);
             return;
         }
-        let gauge = Gauge::default()
+        Gauge::default()
             .style(Modifier::BOLD)
             .gauge_style(Style::new().blue().on_black())
             .label(format!("Осталось {:?} сек.", time_left.as_secs()))
             .percent(
-                100 - (time_elapsed.as_secs() * 100 / session.settings.limits.answer_time.as_secs())
+                (time_elapsed.as_millis() * 100 / session.settings.limits.answer_time.as_millis())
                     as u16,
-            );
-        frame.render_widget(gauge, area);
+            )
+            .render(area, buf);
     }
 
     fn render_settings_column(&self, area: Rect, buf: &mut Buffer) {
@@ -522,6 +595,7 @@ mod tests {
 
     fn test_app(settings: Settings) -> App {
         App {
+            status: Status::Welcome,
             settings,
             correct_answers: 0,
             active_field: None,
