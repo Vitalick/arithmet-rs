@@ -21,6 +21,7 @@ use ratatui::{
 use validations::Validate;
 
 use crate::domain::{banner, operation::Operation, settings::Settings};
+use crate::domain::session::Session;
 
 const CONFIG_PATH: &str = "arithmet.toml";
 const HEADER_NAME: &str = "VIT";
@@ -47,8 +48,9 @@ enum ActiveField {
 }
 
 #[derive(Debug)]
-pub struct App {
+pub struct App<'a> {
     settings: Settings,
+    session: Option<&'a mut Session>,
     correct_answers: usize,
     active_field: Option<ActiveField>,
     input_buffer: String,
@@ -56,10 +58,11 @@ pub struct App {
     exit: bool,
 }
 
-impl Default for App {
+impl Default for App<'_> {
     fn default() -> Self {
         Self {
             settings: Settings::load(CONFIG_PATH).unwrap_or_default(),
+            session: None,
             correct_answers: 0,
             active_field: None,
             input_buffer: String::new(),
@@ -69,7 +72,7 @@ impl Default for App {
     }
 }
 
-impl App {
+impl App<'static> {
     pub fn run(
         &mut self,
         terminal: &mut DefaultTerminal,
@@ -253,7 +256,7 @@ impl App {
     }
 }
 
-impl Widget for &App {
+impl Widget for &App<'static> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let outer = Block::bordered()
             .border_set(border::THICK)
@@ -272,7 +275,7 @@ impl Widget for &App {
     }
 }
 
-impl App {
+impl App<'static> {
     fn instructions(&self) -> Line<'static> {
         Line::from(vec![
             "<+ - * / :>".blue().bold(),
@@ -488,11 +491,12 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
 
-    fn test_app(settings: Settings) -> App {
+    fn test_app(settings: Settings) -> App<'static> {
         App {
             settings,
             correct_answers: 0,
             active_field: None,
+            session: None,
             input_buffer: String::new(),
             cursor_frame: 0,
             exit: false,
