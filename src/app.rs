@@ -262,11 +262,9 @@ impl Widget for &App {
         let inner = outer.inner(area);
         outer.render(area, buf);
 
-        let [main_area, status_area] = Layout::vertical([
-            Constraint::Length(MAIN_AREA_HEIGHT),
-            Constraint::Fill(1),
-        ])
-        .areas(inner);
+        let [main_area, status_area] =
+            Layout::vertical([Constraint::Length(MAIN_AREA_HEIGHT), Constraint::Fill(1)])
+                .areas(inner);
 
         self.render_main(main_area, buf);
         self.render_status(status_area, buf);
@@ -306,24 +304,19 @@ impl App {
             Constraint::Fill(1),
             Constraint::Fill(1),
         ])
-            .spacing(6)
-            .areas(body);
+        .spacing(6)
+        .areas(body);
 
         self.render_actions_column(left, buf);
         self.render_center_column(center, buf);
         self.render_settings_column(right, buf);
     }
 
-    fn render_status(&self, area: Rect, buf: &mut Buffer) {
-        
-    }
+    fn render_status(&self, area: Rect, buf: &mut Buffer) {}
 
     fn render_actions_column(&self, area: Rect, buf: &mut Buffer) {
-        let [_, actions] = Layout::vertical([
-            Constraint::Length(1),
-            Constraint::Fill(1),
-        ])
-        .areas(area);
+        let [_, actions] =
+            Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(area);
 
         self.render_actions(actions, buf);
     }
@@ -367,36 +360,35 @@ impl App {
 
         self.render_header(header, buf);
 
-        let example_block = Block::bordered()
+        self.render_exercise(exercise, buf);
+
+        self.render_check(check, buf);
+    }
+
+    fn render_exercise(&self, area: Rect, buf: &mut Buffer) {
+        let exercise_block = Block::bordered()
             .border_set(border::PLAIN)
             .title(Line::from("Пример".bold()).centered())
             .title_bottom(
                 Line::from(format!("Верных ответов: {}", self.correct_answers).bold()).centered(),
             );
-        Paragraph::new("")
-            .block(example_block)
-            .render(exercise, buf);
+        Paragraph::new("").block(exercise_block).render(area, buf);
+    }
 
+    fn render_check(&self, area: Rect, buf: &mut Buffer) {
         let check_block = Block::bordered()
             .border_set(border::PLAIN)
             .title(Line::from("Проверка".bold()).centered())
             .title_bottom(Line::from("Верный ответ:".bold()).centered());
-        let check_text = vec![
-            Line::from("a)"),
-            Line::from("b)"),
-            Line::from(""),
-        ];
+        let check_text = vec![Line::from("a)"), Line::from("b)"), Line::from("")];
         Paragraph::new(check_text)
             .block(check_block)
-            .render(check, buf);
+            .render(area, buf);
     }
 
     fn render_settings_column(&self, area: Rect, buf: &mut Buffer) {
-        let [_, settings] = Layout::vertical([
-            Constraint::Length(1),
-            Constraint::Fill(1),
-        ])
-        .areas(area);
+        let [_, settings] =
+            Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(area);
 
         self.render_settings(settings, buf);
     }
@@ -550,10 +542,7 @@ mod tests {
         app.start_input(ActiveField::PlayerName);
         let input_buffer = app.input_buffer.clone();
 
-        app.handle_key_event(KeyEvent::new(
-            KeyCode::Char('c'),
-            KeyModifiers::CONTROL,
-        ));
+        app.handle_key_event(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
 
         assert!(app.exit);
         assert_eq!(app.input_buffer, input_buffer);
