@@ -8,6 +8,7 @@ use std::{
 
 use color_eyre::{Result, eyre::WrapErr};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use ratatui::widgets::Borders;
 use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
@@ -19,7 +20,7 @@ use ratatui::{
 };
 use validations::Validate;
 
-use crate::domain::{operation::Operation, settings::Settings};
+use crate::domain::{banner, operation::Operation, settings::Settings};
 
 const CONFIG_PATH: &str = "arithmet.toml";
 const HEADER_NAME: &str = "VIT";
@@ -312,8 +313,6 @@ impl App {
         self.render_settings_column(right, buf);
     }
 
-    fn render_status(&self, area: Rect, buf: &mut Buffer) {}
-
     fn render_actions_column(&self, area: Rect, buf: &mut Buffer) {
         let [_, actions] =
             Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(area);
@@ -384,6 +383,14 @@ impl App {
         Paragraph::new(check_text)
             .block(check_block)
             .render(area, buf);
+    }
+
+    fn render_status(&self, area: Rect, buf: &mut Buffer) {
+        let banner_text = "Добро пожаловать!";
+
+        let banner_paragraph = banner::render_to_paragraph(banner_text);
+
+        banner_paragraph.centered().render(area, buf);
     }
 
     fn render_settings_column(&self, area: Rect, buf: &mut Buffer) {

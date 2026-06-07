@@ -14,7 +14,7 @@ pub(super) const CYR_A: Glyph = [
 #[rustfmt::skip]
 pub(super) const CYR_B: Glyph = [
     "    ",
-    "████",
+    "███ ",
     "█   ",
     "███ ",
     "█  █",
