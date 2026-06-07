@@ -21,7 +21,7 @@ use ratatui::{
 use validations::Validate;
 
 use crate::domain::{banner, operation::Operation, settings::Settings};
-use crate::domain::session::{Session, SessionExerciseIter};
+use crate::domain::session::{Session};
 
 const CONFIG_PATH: &str = "arithmet.toml";
 const HEADER_NAME: &str = "VIT";
