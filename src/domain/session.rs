@@ -62,11 +62,11 @@ impl Answer {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Session {
-    settings: Settings,
+pub struct Session<'a> {
+    settings: &'a Settings,
     answers: Vec<Answer>,
-    #[serde(skip_serializing, skip_deserializing)]
-    generated: usize,
+    #[serde(skip)]
+    iterator: SessionExerciseIter<'a>,
     correct_answers: usize,
     grade: Grade,
 }
@@ -75,27 +75,24 @@ impl Session {
     pub fn new(settings: Settings) -> Result<Self, String> {
         match settings.validate() {
             Ok(_) => Ok(Session {
-                settings,
+                & settings,
                 answers: Vec::new(),
-                generated: 0,
                 correct_answers: 0,
+                iterator: SessionExerciseIter {
+                    settings: settings,
+                    generated: 0,
+                },
                 grade: Grade::default(),
             }),
             Err(e) => Err(e.to_string()),
         }
     }
 
-    fn random_operation(&self) -> Operation {
-        let operations = Vec::from_iter(self.settings.operations.iter().cloned());
-        operations[rand::random_range(0..operations.len())]
-    }
-
-    fn random_exercise(&self) -> Result<Exercise, String> {
-        Exercise::random(
-            self.random_operation(),
-            self.settings.limits.result_min,
-            self.settings.limits.result_max,
-        )
+    pub fn exercises(&self) -> SessionExerciseIter<'_> {
+        SessionExerciseIter {
+            session: self,
+            generated: 0,
+        }
     }
 
     fn recalc_grade(&mut self) {
@@ -316,17 +313,31 @@ impl Session {
     }
 }
 
-impl Iterator for Session {
+#[derive(Debug, Clone)]
+pub struct SessionExerciseIter<'a> {
+    settings: &'a Settings,
+    generated: usize,
+}
+
+impl SessionExerciseIter<'_> {
+    pub fn new(settings: &Settings) -> Self {
+        Self {
+            settings,
+            generated: 0,
+        }
+    }
+}
+impl Iterator for SessionExerciseIter<'_> {
     type Item = Result<Exercise, String>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let answered_or_generated = self.answers.len() + self.generated;
+        let answered_or_generated = self.generated;
         if answered_or_generated >= self.settings.limits.exercise_count {
             return None;
         }
 
         self.generated += 1;
-        Some(self.random_exercise())
+        Some(self.settings.random_exercise())
     }
 }
 
@@ -369,7 +380,7 @@ mod tests {
     #[test]
     fn test_exercises_iter_generates_until_exercise_count() {
         let session = Session::new(settings(3)).unwrap();
-        let exercises = session.collect::<Result<Vec<_>, _>>().unwrap();
+        let exercises = session.exercises().collect::<Result<Vec<_>, _>>().unwrap();
 
         assert_eq!(exercises.len(), 3);
     }
@@ -379,7 +390,7 @@ mod tests {
         let mut session = Session::new(settings(3)).unwrap();
         session.answers.push(answer());
 
-        let exercises = session.collect::<Result<Vec<_>, _>>().unwrap();
+        let exercises = session.exercises().collect::<Result<Vec<_>, _>>().unwrap();
 
         assert_eq!(exercises.len(), 2);
     }
@@ -449,7 +460,6 @@ mod tests {
                 },
             },
             answers: vec![answer(), failed_answer(AnswerError::Escaped)],
-            generated: 0,
             correct_answers: 1,
             grade: Grade::Three,
         };

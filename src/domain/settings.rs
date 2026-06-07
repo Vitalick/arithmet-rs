@@ -2,6 +2,7 @@ use crate::domain::operation::Operation;
 use std::collections::HashSet;
 use std::path::Path;
 use validations::{Error, Errors, Validate};
+use crate::domain::exercise::Exercise;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Limits {
@@ -70,6 +71,19 @@ pub struct Settings {
 impl Settings {
     pub fn from_toml_str(input: &str) -> Result<Self, toml::de::Error> {
         toml::from_str(input)
+    }
+
+    fn random_operation(&self) -> Operation {
+        let operations = Vec::from_iter(self.operations.iter().cloned());
+        operations[rand::random_range(0..operations.len())]
+    }
+
+    pub fn random_exercise(&self) -> Result<Exercise, String> {
+        Exercise::random(
+            self.random_operation(),
+            self.limits.result_min,
+            self.limits.result_max,
+        )
     }
 
     pub fn to_toml_string(&self) -> Result<String, toml::ser::Error> {
