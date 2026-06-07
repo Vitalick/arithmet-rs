@@ -2,8 +2,8 @@ player_name = "Виталий"
 results_dir = "results"
 operations = [
     "-",
-    "/",
     "*",
+    "/",
     "+",
 ]
 

@@ -50,6 +50,7 @@ dependencies = [
  "ratatui",
  "serde",
  "serde_json",
+ "signal-hook",
  "time",
  "toml",
  "validations",

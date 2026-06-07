@@ -1,7 +1,13 @@
-use std::time::Duration;
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 
 use color_eyre::{Result, eyre::WrapErr};
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
@@ -62,8 +68,12 @@ impl Default for App {
 }
 
 impl App {
-    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
-        while !self.exit {
+    pub fn run(
+        &mut self,
+        terminal: &mut DefaultTerminal,
+        shutdown_requested: Arc<AtomicBool>,
+    ) -> Result<()> {
+        while !self.exit && !shutdown_requested.load(Ordering::Relaxed) {
             terminal.draw(|frame| self.render_frame(frame))?;
             self.handle_events().wrap_err("handle events failed")?;
         }
@@ -201,6 +211,11 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
+        if is_ctrl_c(key_event) {
+            self.exit();
+            return;
+        }
+
         if self.handle_input_key_event(key_event) {
             return;
         }
@@ -448,6 +463,11 @@ fn field_hotkey(character: char) -> Option<ActiveField> {
     }
 }
 
+fn is_ctrl_c(key_event: KeyEvent) -> bool {
+    matches!(key_event.code, KeyCode::Char('c' | 'C'))
+        && key_event.modifiers.contains(KeyModifiers::CONTROL)
+}
+
 fn horizontal_inset(area: Rect, inset: u16) -> Rect {
     let inset = inset.min(area.width / 2);
     Rect {
@@ -516,6 +536,21 @@ mod tests {
         assert_eq!(field_hotkey('С'), Some(ActiveField::Complexity));
         assert_eq!(field_hotkey('c'), Some(ActiveField::Complexity));
         assert_eq!(field_hotkey('s'), Some(ActiveField::Complexity));
+    }
+
+    #[test]
+    fn ctrl_c_exits_even_while_editing_text_input() {
+        let mut app = test_app(Settings::default());
+        app.start_input(ActiveField::PlayerName);
+        let input_buffer = app.input_buffer.clone();
+
+        app.handle_key_event(KeyEvent::new(
+            KeyCode::Char('c'),
+            KeyModifiers::CONTROL,
+        ));
+
+        assert!(app.exit);
+        assert_eq!(app.input_buffer, input_buffer);
     }
 
     #[test]
