@@ -65,7 +65,6 @@ impl Answer {
 pub struct Session {
     settings: Settings,
     answers: Vec<Answer>,
-    // iterator: SessionExerciseIter,
     correct_answers: usize,
     grade: Grade,
 }
@@ -77,7 +76,6 @@ impl Session {
                 settings,
                 answers: Vec::new(),
                 correct_answers: 0,
-                // iterator: SessionExerciseIter::new(settings),
                 grade: Grade::default(),
             }),
             Err(e) => Err(e.to_string()),
@@ -355,21 +353,29 @@ mod tests {
     }
 
     #[test]
-    fn test_exercises_iter_generates_until_exercise_count() {
+    fn test_next_generates_exercise_while_session_has_room() {
         let session = Session::new(settings(3)).unwrap();
-        let exercises = session.exercises().collect::<Result<Vec<_>, _>>().unwrap();
+        let exercise = session.next().unwrap();
 
-        assert_eq!(exercises.len(), 3);
+        assert_eq!(exercise.operation, Operation::Addition);
     }
 
     #[test]
-    fn test_exercises_iter_counts_existing_answers() {
+    fn test_have_next_counts_existing_answers() {
         let mut session = Session::new(settings(3)).unwrap();
-        session.add_answer(answer());
+        session.add_answer(answer()).unwrap();
 
-        let exercises = session.exercises().collect::<Result<Vec<_>, _>>().unwrap();
+        assert!(session.have_next());
+        assert_eq!(session.exercises_left(), 2);
+    }
 
-        assert_eq!(exercises.len(), 2);
+    #[test]
+    fn test_next_rejects_finished_session() {
+        let mut session = Session::new(settings(1)).unwrap();
+        session.add_answer(answer()).unwrap();
+
+        assert!(!session.have_next());
+        assert!(session.next().is_err());
     }
 
     #[test]
@@ -425,7 +431,7 @@ mod tests {
     #[test]
     fn test_session_serialization_round_trip_preserves_fields() {
         let session = Session {
-            iterator: SessionExerciseIter::new(Settings {
+            settings: Settings {
                 player_name: "ученик".to_string(),
                 results_dir: "results".to_string(),
                 operations: HashSet::from([Operation::Addition, Operation::DivisionWithRemainder]),
@@ -435,7 +441,7 @@ mod tests {
                     exercise_count: 2,
                     answer_time_seconds: std::time::Duration::from_secs(45),
                 },
-            }),
+            },
             answers: vec![answer(), failed_answer(AnswerError::Escaped)],
             correct_answers: 1,
             grade: Grade::Three,
@@ -444,17 +450,17 @@ mod tests {
         let serialized = serde_json::to_string(&session).unwrap();
         let deserialized: Session = serde_json::from_str(&serialized).unwrap();
 
-        assert_eq!(deserialized.iterator.settings.player_name, "ученик");
-        assert_eq!(deserialized.iterator.settings.results_dir, "results");
+        assert_eq!(deserialized.settings.player_name, "ученик");
+        assert_eq!(deserialized.settings.results_dir, "results");
         assert_eq!(
-            deserialized.iterator.settings.operations,
+            deserialized.settings.operations,
             HashSet::from([Operation::Addition, Operation::DivisionWithRemainder])
         );
-        assert_eq!(deserialized.iterator.settings.limits.result_min, 10);
-        assert_eq!(deserialized.iterator.settings.limits.result_max, 100);
-        assert_eq!(deserialized.iterator.settings.limits.exercise_count, 2);
+        assert_eq!(deserialized.settings.limits.result_min, 10);
+        assert_eq!(deserialized.settings.limits.result_max, 100);
+        assert_eq!(deserialized.settings.limits.exercise_count, 2);
         assert_eq!(
-            deserialized.iterator.settings.limits.answer_time_seconds,
+            deserialized.settings.limits.answer_time_seconds,
             std::time::Duration::from_secs(45)
         );
         assert_eq!(deserialized.answers.len(), 2);
@@ -527,13 +533,13 @@ mod tests {
 
         let session: Session = serde_json::from_str(input).unwrap();
 
-        assert_eq!(session.iterator.settings.player_name, "test");
+        assert_eq!(session.settings.player_name, "test");
         assert_eq!(
-            session.iterator.settings.operations,
+            session.settings.operations,
             HashSet::from([Operation::Addition, Operation::DivisionWithRemainder])
         );
         assert_eq!(
-            session.iterator.settings.limits.answer_time_seconds,
+            session.settings.limits.answer_time_seconds,
             std::time::Duration::from_secs(30)
         );
         assert_eq!(session.answers.len(), 2);

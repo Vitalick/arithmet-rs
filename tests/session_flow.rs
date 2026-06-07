@@ -45,15 +45,15 @@ fn session_generates_answers_and_writes_result() {
     };
     let mut session = Session::new(settings).unwrap();
 
-    let exercises = session.exercises().collect::<Result<Vec<_>, _>>().unwrap();
-    assert_eq!(exercises.len(), 3);
-
-    for exercise in exercises {
+    while session.have_next() {
+        let exercise = session.next().unwrap();
+        let expected = exercise.expected().unwrap();
         session.add_answer(Answer {
             exercise,
-            entered: Ok(exercise.expected().unwrap()),
+            entered: Ok(expected),
             time_elapsed: Duration::from_secs(1),
-        });
+        })
+        .unwrap();
     }
 
     assert!(session.is_finished());
