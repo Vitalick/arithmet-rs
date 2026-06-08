@@ -22,7 +22,7 @@ use std::{
 use validations::Validate;
 
 use crate::domain::exercise::Exercise;
-use crate::domain::session::{ExerciseWithStartTime, Session};
+use crate::domain::session::{Answer, AnswerError, ExerciseWithStartTime, Session};
 use crate::domain::{banner, exercise, operation::Operation, settings::Settings};
 
 const CONFIG_PATH: &str = "arithmet.toml";
@@ -47,6 +47,7 @@ enum ActiveField {
     ResultMax,
     ExerciseCount,
     Complexity,
+    GameAnswer,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,6 +64,7 @@ pub struct App {
     settings: Settings,
     session: Option<Session>,
     exercise_now: Option<ExerciseWithStartTime>,
+    answer: Option<Answer>,
     correct_answers: usize,
     active_field: Option<ActiveField>,
     input_buffer: String,
@@ -79,6 +81,7 @@ impl Default for App {
             correct_answers: 0,
             active_field: None,
             exercise_now: None,
+            answer: None,
             input_buffer: String::new(),
             cursor_frame: 0,
             exit: false,
@@ -92,7 +95,6 @@ impl App {
         terminal: &mut DefaultTerminal,
         shutdown_requested: Arc<AtomicBool>,
     ) -> Result<()> {
-        self.start_game().unwrap();
         while !self.exit && !shutdown_requested.load(Ordering::Relaxed) {
             self.update_status();
             terminal.draw(|frame| self.render_frame(frame))?;
@@ -129,14 +131,9 @@ impl App {
     }
 
     fn game_step(&mut self) -> Result<(), String> {
-        match self.status {
-            Status::Welcome | Status::GameFinished => {}
-            _ => {
-                let session = self.session.as_mut().unwrap();
-                if session.have_next() {
-                    self.exercise_now = Some(session.next()?);
-                }
-            }
+        let session = self.session.as_mut().unwrap();
+        if session.have_next() {
+            self.exercise_now = Some(session.next()?);
         }
         Ok(())
     }
@@ -206,6 +203,24 @@ impl App {
                     return;
                 }
             }
+            ActiveField::GameAnswer => {
+                let exercise = self.exercise_now.unwrap();
+                if let Ok(value) = value.parse() {
+                    self.answer = Some(Answer {
+                        exercise: exercise.exercise,
+                        entered: Ok(value),
+                        time_elapsed: exercise.start_time.elapsed(),
+                    });
+                } else {
+                    self.answer = Some(Answer {
+                        exercise: exercise.exercise,
+                        entered: Err(AnswerError::InvalidInput),
+                        time_elapsed: exercise.start_time.elapsed(),
+                    });
+                    self.cancel_input();
+                    return;
+                }
+            }
             ActiveField::Complexity => {
                 if let Ok(value) = value.parse::<u64>() {
                     candidate.limits.answer_time = Duration::from_secs(value);
@@ -234,6 +249,11 @@ impl App {
 
     fn handle_input_key_event(&mut self, key_event: KeyEvent) -> bool {
         if self.active_field.is_none() {
+            if key_event.code == KeyCode::Enter {
+                self.start_game().unwrap();
+                self.start_input(ActiveField::GameAnswer);
+                return true
+            }
             return false;
         }
 

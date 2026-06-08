@@ -77,7 +77,7 @@ impl Answer {
         }
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExerciseWithStartTime {
     pub exercise: Exercise,
     pub start_time: Instant,
