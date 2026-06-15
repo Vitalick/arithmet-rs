@@ -17,7 +17,7 @@ const PROTOCOL_OPERATION_ORDER: [Operation; 5] = [
     Operation::DivisionWithRemainder,
 ];
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub enum AnswerError {
     Escaped,
     TimedOut,
@@ -25,7 +25,7 @@ pub enum AnswerError {
     InvalidInput,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Answer {
     pub exercise: Exercise,
     pub entered: Result<i32, AnswerError>,
@@ -53,7 +53,7 @@ impl Answer {
                 } else {
                     "Неверно...".to_string()
                 }
-            },
+            }
             Err(AnswerError::Escaped | AnswerError::SessionAborted) => "Игра прервана".to_string(),
             Err(AnswerError::TimedOut) => "Время вышло!".to_string(),
             Err(AnswerError::InvalidInput) => "Неверно :(".to_string(),
@@ -77,6 +77,17 @@ impl Answer {
         }
     }
 }
+
+impl Default for Answer {
+    fn default() -> Self {
+        Self {
+            exercise: Exercise::new(0, Operation::Addition, 0),
+            entered: Ok(0),
+            time_elapsed: std::time::Duration::from_secs(0),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct ExerciseWithStartTime {
     pub exercise: Exercise,

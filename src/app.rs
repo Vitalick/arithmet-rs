@@ -244,6 +244,10 @@ impl App {
             ActiveField::ResultMax => self.settings.limits.result_max.to_string(),
             ActiveField::ExerciseCount => self.settings.limits.exercise_count.to_string(),
             ActiveField::Complexity => self.settings.limits.answer_time.as_secs().to_string(),
+            ActiveField::GameAnswer => match self.answer.unwrap_or_default().entered {
+                Ok(value) => value.to_string(),
+                Err(_) => String::default(),
+            },
         }
     }
 
@@ -252,7 +256,7 @@ impl App {
             if key_event.code == KeyCode::Enter {
                 self.start_game().unwrap();
                 self.start_input(ActiveField::GameAnswer);
-                return true
+                return true;
             }
             return false;
         }
@@ -492,7 +496,7 @@ impl App {
 
     fn render_progress(&self, area: Rect, buf: &mut Buffer) {
         match self.status {
-            Status::Welcome | Status::GameFinished => {return},
+            Status::Welcome | Status::GameFinished => return,
             _ => {}
         }
         let session = self.session.as_ref().unwrap();
@@ -617,6 +621,7 @@ mod tests {
         App {
             status: Status::Welcome,
             settings,
+            answer: None,
             correct_answers: 0,
             active_field: None,
             session: None,
