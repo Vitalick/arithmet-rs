@@ -1,8 +1,8 @@
 player_name = "неизвестно"
 results_dir = "results"
 operations = [
-    "+",
     ":",
+    "+",
 ]
 
 [limits]

@@ -2,7 +2,14 @@ use crate::domain::operation::Operation;
 use std::collections::HashSet;
 use std::path::Path;
 use validations::{Error, Errors, Validate};
-use crate::domain::exercise::Exercise;
+
+pub const PROTOCOL_OPERATION_ORDER: [Operation; 5] = [
+    Operation::Addition,
+    Operation::Subtraction,
+    Operation::Multiplication,
+    Operation::Division,
+    Operation::DivisionWithRemainder,
+];
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Limits {
@@ -60,30 +67,44 @@ impl Validate<String> for Limits {
     }
 }
 
+fn serialize_operations<S>(operations: &HashSet<Operation>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let mut operations: Vec<Operation> = operations.iter().cloned().collect();
+    operations.sort_by(|a, b| {
+        PROTOCOL_OPERATION_ORDER
+            .iter()
+            .position(|op| op == a)
+            .cmp(&PROTOCOL_OPERATION_ORDER.iter().position(|op| op == b))
+    });
+    serializer.collect_seq(operations)
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Settings {
     pub player_name: String,
     pub results_dir: String,
+    #[serde(serialize_with = "serialize_operations")]
     pub operations: HashSet<Operation>,
     pub limits: Limits,
 }
 
 impl Settings {
+    pub fn enabled_operations(&self) -> Vec<Operation> {
+        PROTOCOL_OPERATION_ORDER
+            .iter()
+            .copied()
+            .filter(|operation| self.operations.contains(operation))
+            .collect()
+    }
     pub fn from_toml_str(input: &str) -> Result<Self, toml::de::Error> {
         toml::from_str(input)
     }
 
-    fn random_operation(&self) -> Operation {
+    pub fn random_operation(&self) -> Operation {
         let operations = Vec::from_iter(self.operations.iter().cloned());
         operations[rand::random_range(0..operations.len())]
-    }
-
-    pub fn random_exercise(&self) -> Result<Exercise, String> {
-        Exercise::random(
-            self.random_operation(),
-            self.limits.result_min,
-            self.limits.result_max,
-        )
     }
 
     pub fn to_toml_string(&self) -> Result<String, toml::ser::Error> {
@@ -201,10 +222,7 @@ answer_time = "30s"
             settings.limits.exercise_count,
             parsed_again.limits.exercise_count
         );
-        assert_eq!(
-            settings.limits.answer_time,
-            parsed_again.limits.answer_time
-        );
+        assert_eq!(settings.limits.answer_time, parsed_again.limits.answer_time);
     }
 
     #[test]

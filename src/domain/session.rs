@@ -1,5 +1,5 @@
-use crate::domain::exercise::Exercise;
-use crate::domain::expression::Expression;
+use crate::domain::answer::Answer;
+use crate::domain::expression::Exercise;
 use crate::domain::grade::Grade;
 use crate::domain::operation::Operation;
 use crate::domain::settings::Settings;
@@ -8,100 +8,6 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 use time::OffsetDateTime;
 use validations::Validate;
-
-const PROTOCOL_OPERATION_ORDER: [Operation; 5] = [
-    Operation::Addition,
-    Operation::Subtraction,
-    Operation::Multiplication,
-    Operation::Division,
-    Operation::DivisionWithRemainder,
-];
-
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
-pub enum AnswerError {
-    Escaped,
-    TimedOut,
-    SessionAborted,
-    InvalidInput,
-}
-
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
-pub struct Answer {
-    pub exercise: Exercise,
-    pub entered: Result<i32, AnswerError>,
-
-    #[serde(with = "humantime_serde")]
-    pub time_elapsed: std::time::Duration,
-}
-
-impl Answer {
-    fn protocol_entered(&self) -> String {
-        match self.entered {
-            Ok(entered) => format!("введено {:<5}", entered),
-            Err(AnswerError::Escaped) => "нажата клавиша <Esc>".to_string(),
-            Err(AnswerError::TimedOut) => "вышло время".to_string(),
-            Err(AnswerError::SessionAborted) => "нажата клавиша <F10>".to_string(),
-            Err(AnswerError::InvalidInput) => "некорректный ввод".to_string(),
-        }
-    }
-
-    pub fn banner(&self) -> String {
-        match self.entered {
-            Ok(entered) => {
-                if self.is_correct() {
-                    "Молодец!".to_string()
-                } else {
-                    "Неверно...".to_string()
-                }
-            }
-            Err(AnswerError::Escaped | AnswerError::SessionAborted) => "Игра прервана".to_string(),
-            Err(AnswerError::TimedOut) => "Время вышло!".to_string(),
-            Err(AnswerError::InvalidInput) => "Неверно :(".to_string(),
-        }
-    }
-
-    pub fn is_correct(&self) -> bool {
-        match self.entered {
-            Ok(entered) => match self.exercise.compare(entered) {
-                Ok(true) => true,
-                _ => false,
-            },
-            Err(_) => false,
-        }
-    }
-
-    pub fn check_expressions(&self) -> Result<[Box<dyn Expression>; 2], String> {
-        match self.entered {
-            Ok(entered) => self.exercise.check_expressions(entered),
-            Err(_) => Err("Cannot check expressions with invalid input".to_string()),
-        }
-    }
-}
-
-impl Default for Answer {
-    fn default() -> Self {
-        Self {
-            exercise: Exercise::new(0, Operation::Addition, 0),
-            entered: Ok(0),
-            time_elapsed: std::time::Duration::from_secs(0),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ExerciseWithStartTime {
-    pub exercise: Exercise,
-    pub start_time: Instant,
-}
-
-impl ExerciseWithStartTime {
-    pub fn new(exercise: Exercise) -> Self {
-        Self {
-            exercise,
-            start_time: Instant::now(),
-        }
-    }
-}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Session {
@@ -227,7 +133,7 @@ impl Session {
 
     fn human_results(&self, saved_at: OffsetDateTime) -> String {
         let mut output = String::new();
-        let operations = self.enabled_operations();
+        let operations = self.settings.enabled_operations();
 
         let _ = writeln!(
             output,
@@ -325,14 +231,6 @@ impl Session {
         output
     }
 
-    fn enabled_operations(&self) -> Vec<Operation> {
-        PROTOCOL_OPERATION_ORDER
-            .iter()
-            .copied()
-            .filter(|operation| self.settings.operations.contains(operation))
-            .collect()
-    }
-
     fn operation_protocol_name(operation: Operation) -> String {
         operation.label().to_lowercase()
     }
@@ -374,6 +272,7 @@ mod tests {
     use super::*;
     use serde_json::json;
     use std::collections::HashSet;
+    use crate::domain::answer::AnswerError;
 
     fn settings(exercise_count: usize) -> Settings {
         Settings {
@@ -607,5 +506,20 @@ mod tests {
         );
         assert_eq!(session.correct_answers, 1);
         assert!(matches!(session.grade, Grade::Three));
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ExerciseWithStartTime {
+    pub exercise: Exercise,
+    pub start_time: Instant,
+}
+
+impl ExerciseWithStartTime {
+    pub fn new(exercise: Exercise) -> Self {
+        Self {
+            exercise,
+            start_time: Instant::now(),
+        }
     }
 }

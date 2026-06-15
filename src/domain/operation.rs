@@ -1,8 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::Display;
 
-use crate::domain::exercise::Exercise;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Operation {
     // сложение
@@ -97,10 +95,6 @@ impl From<&str> for Operation {
 impl Operation {
     pub fn hotkey_str(&self) -> String {
         self.symbol().to_string()
-    }
-
-    pub fn make_exercise(&self, left: i32, right: i32) -> Exercise {
-        Exercise::new(left, *self, right)
     }
 
     pub fn validates_operands(&self, _left: i32, right: i32) -> Result<(), String> {

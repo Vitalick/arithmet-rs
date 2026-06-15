@@ -1,7 +1,7 @@
 use color_eyre::{Result, eyre::WrapErr};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::style::{Modifier, Style};
-use ratatui::widgets::{Borders, Gauge};
+use ratatui::widgets::Gauge;
 use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
@@ -11,7 +11,6 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Paragraph, Widget},
 };
-use std::time::Instant;
 use std::{
     sync::{
         Arc,
@@ -21,9 +20,10 @@ use std::{
 };
 use validations::Validate;
 
-use crate::domain::exercise::Exercise;
-use crate::domain::session::{Answer, AnswerError, ExerciseWithStartTime, Session};
-use crate::domain::{banner, exercise, operation::Operation, settings::Settings};
+use crate::domain::answer::{Answer, AnswerError};
+use crate::domain::session::ExerciseWithStartTime;
+use crate::domain::session::Session;
+use crate::domain::{banner, operation::Operation, settings::Settings};
 
 const CONFIG_PATH: &str = "arithmet.toml";
 const HEADER_NAME: &str = "VIT";

@@ -1,7 +1,10 @@
-use crate::domain::expression::{Compare, Expression, FakeExercise};
+use crate::domain::expression::Expression;
 use crate::domain::operation::Operation;
 use rand::random_range;
 use std::fmt::{Display, Formatter};
+use crate::domain::expression::comparison::Comparison;
+use crate::domain::expression::fake_exercise::FakeExercise;
+use crate::domain::settings::Settings;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Exercise {
@@ -207,13 +210,39 @@ impl Exercise {
             ]),
             Operation::DivisionWithRemainder => Ok([
                 Box::new(
-                    FakeExercise::clone_exercise(*self)?
+                    self.make_fake_exercise()?
                         .with_answer(entered)
                         .with_remainder(self.left - self.right * entered),
                 ),
-                Box::new(Compare::new(self.left - self.right * entered, self.right)),
+                Box::new(Comparison::new(self.left - self.right * entered, self.right)),
             ]),
         }
+    }
+
+    fn make_fake_exercise(&self) -> Result<FakeExercise, String> {
+        Ok(FakeExercise {
+            left: self.left,
+            operation: self.operation,
+            right: self.right,
+            answer: self.expected()?,
+            remainder: self.expected_remainder()?,
+        })
+    }
+}
+
+impl Operation {
+    pub fn make_exercise(&self, left: i32, right: i32) -> Exercise {
+        Exercise::new(left, *self, right)
+    }
+}
+
+impl Settings {
+    pub fn random_exercise(&self) -> Result<Exercise, String> {
+        Exercise::random(
+            self.random_operation(),
+            self.limits.result_min,
+            self.limits.result_max,
+        )
     }
 }
 
