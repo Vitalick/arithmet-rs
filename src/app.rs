@@ -18,10 +18,11 @@ use std::{
     },
     time::Duration,
 };
+use strum::IntoEnumIterator;
 use validations::Validate;
 
 use crate::domain::answer::{Answer, AnswerError};
-use crate::domain::session::ExerciseWithStartTime;
+use crate::domain::expression::ExerciseWithStartTime;
 use crate::domain::session::Session;
 use crate::domain::{banner, operation::Operation, settings::Settings};
 
@@ -30,13 +31,6 @@ const HEADER_NAME: &str = "VIT";
 const MAIN_AREA_HEIGHT: u16 = 16;
 const STATUS_AREA_HEIGHT: u16 = 10;
 
-const OPERATION_ORDER: [Operation; 5] = [
-    Operation::Addition,
-    Operation::Subtraction,
-    Operation::Multiplication,
-    Operation::Division,
-    Operation::DivisionWithRemainder,
-];
 
 const INPUT_CURSOR: [char; 4] = ['-', '\\', '|', '/'];
 
@@ -399,8 +393,7 @@ impl App {
             .border_set(border::PLAIN)
             .title(Line::from("Действие".bold()).centered());
 
-        let operations = OPERATION_ORDER
-            .into_iter()
+        let operations = Operation::iter()
             .map(|operation| self.operation_line(operation))
             .collect::<Vec<_>>();
 

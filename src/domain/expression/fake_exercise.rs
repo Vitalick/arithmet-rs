@@ -66,3 +66,37 @@ impl Expression for FakeExercise {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_division_with_remainder_check_expression() {
+        let cases = [
+            (
+                FakeExercise::new_with_remainer(10, Operation::Division, 3, 3, 1),
+                "10 / 3 = 3 (остаток 1)",
+            ),
+            (
+                FakeExercise::new_with_remainer(10, Operation::Division, 3, 2, 4),
+                "10 / 3 = 2 (остаток 4)",
+            ),
+            (
+                FakeExercise::new(12, Operation::Division, 3, 4),
+                "12 / 3 = 4",
+            ),
+        ];
+
+        for (check, expression) in cases {
+            assert_eq!(check.evaluate().unwrap(), expression);
+        }
+    }
+
+    #[test]
+    fn test_division_with_remainder() {
+        let division = FakeExercise::new_with_remainer(10, Operation::Division, 3, 3, 1);
+        assert_eq!(division.evaluate().unwrap(), "10 / 3 = 3 (остаток 1)");
+    }
+
+}

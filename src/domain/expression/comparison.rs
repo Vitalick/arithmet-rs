@@ -32,3 +32,22 @@ impl Expression for Comparison {
         Ok(format!("{} {} {}", self.left, symbol, self.right))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+
+    #[test]
+    fn test_compare_expression() {
+        let cases = [
+            (Comparison::new(1, 3), "1 < 3"),
+            (Comparison::new(3, 1), "3 > 1"),
+            (Comparison::new(3, 3), "3 = 3"),
+        ];
+
+        for (compare, expression) in cases {
+            assert_eq!(compare.evaluate().unwrap(), expression);
+        }
+    }
+}

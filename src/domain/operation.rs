@@ -1,7 +1,8 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::Display;
+use strum_macros::{EnumCount, EnumIter};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumCount, EnumIter)]
 pub enum Operation {
     // сложение
     Addition,
@@ -16,6 +17,14 @@ pub enum Operation {
     // остаток от деления
     // RemainderFromDivision,
 }
+
+pub const PROTOCOL_OPERATION_ORDER: [Operation; 5] = [
+    Operation::Addition,
+    Operation::Subtraction,
+    Operation::Multiplication,
+    Operation::Division,
+    Operation::DivisionWithRemainder,
+];
 
 impl Display for Operation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -187,9 +196,11 @@ mod tests {
         assert!(Operation::Subtraction.validates_operands(5, 3).is_ok());
         assert!(Operation::Multiplication.validates_operands(4, 6).is_ok());
         assert!(Operation::Division.validates_operands(10, 2).is_ok());
-        assert!(Operation::DivisionWithRemainder
-            .validates_operands(10, 3)
-            .is_ok());
+        assert!(
+            Operation::DivisionWithRemainder
+                .validates_operands(10, 3)
+                .is_ok()
+        );
         assert!(Operation::Division.validates_operands(10, 0).is_err());
     }
 }

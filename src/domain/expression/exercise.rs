@@ -1,10 +1,11 @@
 use crate::domain::expression::Expression;
-use crate::domain::operation::Operation;
-use rand::random_range;
-use std::fmt::{Display, Formatter};
 use crate::domain::expression::comparison::Comparison;
 use crate::domain::expression::fake_exercise::FakeExercise;
+use crate::domain::operation::Operation;
 use crate::domain::settings::Settings;
+use rand::random_range;
+use std::fmt::{Display, Formatter};
+use std::time::Instant;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Exercise {
@@ -214,7 +215,10 @@ impl Exercise {
                         .with_answer(entered)
                         .with_remainder(self.left - self.right * entered),
                 ),
-                Box::new(Comparison::new(self.left - self.right * entered, self.right)),
+                Box::new(Comparison::new(
+                    self.left - self.right * entered,
+                    self.right,
+                )),
             ]),
         }
     }
@@ -237,12 +241,33 @@ impl Operation {
 }
 
 impl Settings {
-    pub fn random_exercise(&self) -> Result<Exercise, String> {
+    fn random_exercise(&self) -> Result<Exercise, String> {
         Exercise::random(
             self.random_operation(),
             self.limits.result_min,
             self.limits.result_max,
         )
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ExerciseWithStartTime {
+    pub exercise: Exercise,
+    pub start_time: Instant,
+}
+
+impl ExerciseWithStartTime {
+    pub fn new(exercise: Exercise) -> Self {
+        Self {
+            exercise,
+            start_time: Instant::now(),
+        }
+    }
+}
+
+impl Settings {
+    pub fn random_exercise_with_time(&self) -> Result<ExerciseWithStartTime, String> {
+        Ok(ExerciseWithStartTime::new(self.random_exercise()?))
     }
 }
 

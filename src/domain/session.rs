@@ -1,13 +1,11 @@
 use crate::domain::answer::Answer;
-use crate::domain::expression::Exercise;
 use crate::domain::grade::Grade;
-use crate::domain::operation::Operation;
 use crate::domain::settings::Settings;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
-use std::time::Instant;
 use time::OffsetDateTime;
 use validations::Validate;
+use crate::domain::expression::ExerciseWithStartTime;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Session {
@@ -38,7 +36,7 @@ impl Session {
         if !self.have_next() {
             return Err("Достигнут максимум количества упражнений".to_string());
         }
-        Ok(ExerciseWithStartTime::new(self.settings.random_exercise()?))
+        self.settings.random_exercise_with_time()
     }
 
     fn recalc_grade(&mut self) {
@@ -151,7 +149,7 @@ impl Session {
             "Действия: {}",
             operations
                 .iter()
-                .map(|operation| format!(" {}", Self::operation_protocol_name(*operation)))
+                .map(|operation| format!(" {}", operation.label().to_lowercase()))
                 .collect::<Vec<_>>()
                 .join(",")
         );
@@ -187,7 +185,7 @@ impl Session {
             let _ = writeln!(
                 output,
                 "{:>19} - {}, верных ответов - {}",
-                Self::operation_protocol_name(*operation),
+                operation.label().to_lowercase(),
                 total,
                 correct
             );
@@ -231,10 +229,6 @@ impl Session {
         output
     }
 
-    fn operation_protocol_name(operation: Operation) -> String {
-        operation.label().to_lowercase()
-    }
-
     fn seconds_words(seconds: u64) -> (&'static str, &'static str) {
         let remainder = if (11..=14).contains(&(seconds % 100)) {
             0
@@ -272,7 +266,9 @@ mod tests {
     use super::*;
     use serde_json::json;
     use std::collections::HashSet;
+    use crate::domain::expression::Exercise;
     use crate::domain::answer::AnswerError;
+    use crate::domain::operation::Operation;
 
     fn settings(exercise_count: usize) -> Settings {
         Settings {
@@ -506,20 +502,5 @@ mod tests {
         );
         assert_eq!(session.correct_answers, 1);
         assert!(matches!(session.grade, Grade::Three));
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ExerciseWithStartTime {
-    pub exercise: Exercise,
-    pub start_time: Instant,
-}
-
-impl ExerciseWithStartTime {
-    pub fn new(exercise: Exercise) -> Self {
-        Self {
-            exercise,
-            start_time: Instant::now(),
-        }
     }
 }

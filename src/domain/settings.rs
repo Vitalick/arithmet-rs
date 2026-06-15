@@ -1,15 +1,8 @@
-use crate::domain::operation::Operation;
+use crate::domain::operation::{Operation, PROTOCOL_OPERATION_ORDER};
 use std::collections::HashSet;
 use std::path::Path;
+use strum::IntoEnumIterator;
 use validations::{Error, Errors, Validate};
-
-pub const PROTOCOL_OPERATION_ORDER: [Operation; 5] = [
-    Operation::Addition,
-    Operation::Subtraction,
-    Operation::Multiplication,
-    Operation::Division,
-    Operation::DivisionWithRemainder,
-];
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Limits {
@@ -71,13 +64,7 @@ fn serialize_operations<S>(operations: &HashSet<Operation>, serializer: S) -> Re
 where
     S: serde::Serializer,
 {
-    let mut operations: Vec<Operation> = operations.iter().cloned().collect();
-    operations.sort_by(|a, b| {
-        PROTOCOL_OPERATION_ORDER
-            .iter()
-            .position(|op| op == a)
-            .cmp(&PROTOCOL_OPERATION_ORDER.iter().position(|op| op == b))
-    });
+    let operations = Operation::iter().filter(|op| operations.contains(op)).collect::<Vec<_>>();
     serializer.collect_seq(operations)
 }
 
@@ -92,11 +79,7 @@ pub struct Settings {
 
 impl Settings {
     pub fn enabled_operations(&self) -> Vec<Operation> {
-        PROTOCOL_OPERATION_ORDER
-            .iter()
-            .copied()
-            .filter(|operation| self.operations.contains(operation))
-            .collect()
+        Operation::iter().filter(|op| self.operations.contains(op)).collect::<Vec<_>>()
     }
     pub fn from_toml_str(input: &str) -> Result<Self, toml::de::Error> {
         toml::from_str(input)
