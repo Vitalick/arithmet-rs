@@ -9,4 +9,4 @@ operations = [
 result_min = 100
 result_max = 150
 exercise_count = 20
-answer_time = "30s"
+answer_time = "7s"
