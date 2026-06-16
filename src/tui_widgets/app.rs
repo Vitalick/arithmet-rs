@@ -43,7 +43,7 @@ enum ActiveField {
 }
 
 #[derive(Debug)]
-pub struct App<'a> {
+pub struct App {
     status: Status,
     settings: Settings,
     session: Option<Session>,
@@ -55,23 +55,17 @@ pub struct App<'a> {
     cursor_frame: usize,
     exit: bool,
 
-    status_widget: StatusWidget<'a>,
 }
 
-impl<'a> Default for App<'a> {
+impl Default for App {
     fn default() -> Self {
-        let status = Status::Welcome;
-        let session = None;
-        let exercise_now = None;
-        let status_widget = StatusWidget::new(&session, &exercise_now, &status);
         Self {
-            status_widget,
-            status,
+            status: Status::Welcome,
             settings: Settings::load(CONFIG_PATH).unwrap_or_default(),
-            session,
+            session: None,
             correct_answers: 0,
             active_field: None,
-            exercise_now,
+            exercise_now: None,
             answer: None,
             input_buffer: String::new(),
             cursor_frame: 0,
@@ -333,7 +327,7 @@ impl Widget for &App {
                 .areas(inner);
 
         self.render_main(main_area, buf);
-        self.status_widget.render(status_area, buf);
+        StatusWidget::new(&self.session, &self.exercise_now, &self.status).render(status_area, buf);
     }
 }
 
