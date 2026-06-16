@@ -333,7 +333,7 @@ impl Widget for &App {
                 .areas(inner);
 
         self.render_main(main_area, buf);
-        StatusWidget::new(&self.session, &self.exercise_now, &self.status).render(status_area, buf);
+        self.status_widget.render(status_area, buf);
     }
 }
 
