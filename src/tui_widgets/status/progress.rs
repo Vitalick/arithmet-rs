@@ -1,11 +1,11 @@
-use std::time::Duration;
+use super::Status;
+use crate::domain::expression::ExerciseWithStartTime;
+use crate::domain::session::Session;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Modifier, Style};
 use ratatui::widgets::{Gauge, Widget};
-use crate::domain::expression::ExerciseWithStartTime;
-use crate::domain::session::Session;
-use super::Status;
+use std::time::Duration;
 
 #[derive(Debug)]
 pub struct ProgressWidget<'a> {
@@ -15,8 +15,16 @@ pub struct ProgressWidget<'a> {
 }
 
 impl<'a> ProgressWidget<'a> {
-    pub fn new(session: &'a Option<Session>, exercise_now: &'a Option<ExerciseWithStartTime>, status: &'a Status) -> Self {
-        ProgressWidget { session, exercise_now, status }
+    pub fn new(
+        session: &'a Option<Session>,
+        exercise_now: &'a Option<ExerciseWithStartTime>,
+        status: &'a Status,
+    ) -> Self {
+        ProgressWidget {
+            session,
+            exercise_now,
+            status,
+        }
     }
 }
 impl Widget for ProgressWidget<'_> {

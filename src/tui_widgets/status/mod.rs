@@ -1,5 +1,5 @@
-mod status;
 mod banner;
 mod progress;
+mod status;
 
-pub use status::{StatusWidget, Status};
+pub use status::{Status, StatusWidget};

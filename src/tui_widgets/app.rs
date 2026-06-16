@@ -6,8 +6,8 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::Stylize,
     symbols::border,
-    text::{Line, Span},
-    widgets::{Block, Paragraph, Widget},
+    text::Line,
+    widgets::{Block, Widget},
 };
 use std::{
     sync::{
@@ -16,24 +16,22 @@ use std::{
     },
     time::Duration,
 };
-use strum::IntoEnumIterator;
 use validations::Validate;
 
 use crate::domain::answer::{Answer, AnswerError};
 use crate::domain::expression::ExerciseWithStartTime;
 use crate::domain::session::Session;
 use crate::domain::{operation::Operation, settings::Settings};
+use crate::tui_widgets::main::{MainWidget};
 use crate::tui_widgets::status::{Status, StatusWidget};
 
 const CONFIG_PATH: &str = "arithmet.toml";
-const HEADER_NAME: &str = "VIT";
 const MAIN_AREA_HEIGHT: u16 = 16;
 const STATUS_AREA_HEIGHT: u16 = 10;
 
-const INPUT_CURSOR: [char; 4] = ['-', '\\', '|', '/'];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ActiveField {
+pub enum ActiveField {
     PlayerName,
     ResultMin,
     ResultMax,
@@ -54,7 +52,6 @@ pub struct App {
     input_buffer: String,
     cursor_frame: usize,
     exit: bool,
-
 }
 
 impl Default for App {
@@ -305,8 +302,6 @@ impl App {
                 }
                 _ => {}
             }
-        } else if self.active_field.is_some() {
-            self.cursor_frame = (self.cursor_frame + 1) % INPUT_CURSOR.len();
         }
         Ok(())
     }
@@ -322,11 +317,19 @@ impl Widget for &App {
         let inner = outer.inner(area);
         outer.render(area, buf);
 
-        let [main_area, status_area] =
-            Layout::vertical([Constraint::Length(MAIN_AREA_HEIGHT), Constraint::Fill(1)])
-                .areas(inner);
+        let [main_area, status_area] = Layout::vertical([
+            Constraint::Length(MAIN_AREA_HEIGHT),
+            Constraint::Min(STATUS_AREA_HEIGHT),
+        ])
+        .areas(inner);
 
-        self.render_main(main_area, buf);
+        MainWidget::new(
+            &self.settings,
+            self.correct_answers,
+            self.active_field,
+            &self.input_buffer,
+        )
+        .render(main_area, buf);
         StatusWidget::new(&self.session, &self.exercise_now, &self.status).render(status_area, buf);
     }
 }
@@ -346,165 +349,6 @@ impl App {
             " - старт".into(),
         ])
     }
-
-    fn render_header(&self, area: Rect, buf: &mut Buffer) {
-        let header = Paragraph::new(vec![
-            Line::from(format!("==== версия {} ====", env!("CARGO_PKG_VERSION"))),
-            Line::from(format!("{:<12}{:>12}", HEADER_NAME, 2026)),
-        ])
-        .centered();
-
-        header.render(area, buf);
-    }
-
-    fn render_main(&self, area: Rect, buf: &mut Buffer) {
-        let body = horizontal_inset(area, 4);
-        let [left, center, right] = Layout::horizontal([
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-        ])
-        .spacing(6)
-        .areas(body);
-
-        self.render_actions_column(left, buf);
-        self.render_center_column(center, buf);
-        self.render_settings_column(right, buf);
-    }
-
-    fn render_actions_column(&self, area: Rect, buf: &mut Buffer) {
-        let [_, actions] =
-            Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(area);
-
-        self.render_actions(actions, buf);
-    }
-
-    fn render_actions(&self, area: Rect, buf: &mut Buffer) {
-        let block = Block::bordered()
-            .border_set(border::PLAIN)
-            .title(Line::from("Действие".bold()).centered());
-
-        let operations = Operation::iter()
-            .map(|operation| self.operation_line(operation))
-            .collect::<Vec<_>>();
-
-        Paragraph::new(operations).block(block).render(area, buf);
-    }
-
-    fn operation_line(&self, operation: Operation) -> Line<'static> {
-        let checked = if self.settings.operations.contains(&operation) {
-            "[x]"
-        } else {
-            "[ ]"
-        };
-
-        Line::from(vec![
-            format!("{}  ", checked).into(),
-            operation.symbol().blue().bold(),
-            " ".into(),
-            operation.label().to_lowercase().into(),
-        ])
-    }
-
-    fn render_center_column(&self, area: Rect, buf: &mut Buffer) {
-        let [header, exercise, check] = Layout::vertical([
-            Constraint::Length(2),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-        ])
-        .spacing(1)
-        .areas(area);
-
-        self.render_header(header, buf);
-
-        self.render_exercise(exercise, buf);
-
-        self.render_check(check, buf);
-    }
-
-    fn render_exercise(&self, area: Rect, buf: &mut Buffer) {
-        let exercise_block = Block::bordered()
-            .border_set(border::PLAIN)
-            .title(Line::from("Пример".bold()).centered())
-            .title_bottom(
-                Line::from(format!("Верных ответов: {}", self.correct_answers).bold()).centered(),
-            );
-        Paragraph::new("").block(exercise_block).render(area, buf);
-    }
-
-    fn render_check(&self, area: Rect, buf: &mut Buffer) {
-        let check_block = Block::bordered()
-            .border_set(border::PLAIN)
-            .title(Line::from("Проверка".bold()).centered())
-            .title_bottom(Line::from("Верный ответ:".bold()).centered());
-        let check_text = vec![Line::from("a)"), Line::from("b)"), Line::from("")];
-        Paragraph::new(check_text)
-            .block(check_block)
-            .render(area, buf);
-    }
-
-    fn render_settings_column(&self, area: Rect, buf: &mut Buffer) {
-        let [_, settings] =
-            Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(area);
-
-        self.render_settings(settings, buf);
-    }
-
-    fn render_settings(&self, area: Rect, buf: &mut Buffer) {
-        let block = Block::bordered()
-            .border_set(border::PLAIN)
-            .title(Line::from("Настройки".bold()).centered());
-
-        Paragraph::new(vec![
-            self.field_line("И", "мя: ", ActiveField::PlayerName),
-            Line::from(""),
-            Line::from("Величина результата".bold()),
-            Line::from(vec![
-                "О".blue().bold(),
-                "т ".into(),
-                self.field_value_span(ActiveField::ResultMin),
-                Span::raw("      "),
-                "Д".blue().bold(),
-                "о ".into(),
-                self.field_value_span(ActiveField::ResultMax),
-            ]),
-            Line::from(""),
-            self.field_line("К", "оличество примеров: ", ActiveField::ExerciseCount),
-            self.field_line("С", "ложность: ", ActiveField::Complexity),
-        ])
-        .block(block)
-        .render(area, buf);
-    }
-
-    fn field_line(
-        &self,
-        first_letter: &'static str,
-        rest: &'static str,
-        field: ActiveField,
-    ) -> Line<'static> {
-        Line::from(vec![
-            first_letter.blue().bold(),
-            rest.into(),
-            self.field_value_span(field),
-        ])
-    }
-
-    fn field_value_span(&self, field: ActiveField) -> Span<'static> {
-        let value = if self.active_field == Some(field) {
-            format!(
-                "[ {}{} ]",
-                self.input_buffer, INPUT_CURSOR[self.cursor_frame]
-            )
-        } else {
-            format!("[ {} ]", self.field_value(field))
-        };
-
-        if self.active_field == Some(field) {
-            value.blue().bold()
-        } else {
-            value.into()
-        }
-    }
 }
 
 fn field_hotkey(character: char) -> Option<ActiveField> {
@@ -523,19 +367,10 @@ fn is_ctrl_c(key_event: KeyEvent) -> bool {
         && key_event.modifiers.contains(KeyModifiers::CONTROL)
 }
 
-fn horizontal_inset(area: Rect, inset: u16) -> Rect {
-    let inset = inset.min(area.width / 2);
-    Rect {
-        x: area.x + inset,
-        y: area.y,
-        width: area.width.saturating_sub(inset * 2),
-        height: area.height,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tui_widgets::main::HEADER_NAME;
     use std::collections::HashSet;
 
     fn test_app(settings: Settings) -> App {
@@ -658,16 +493,21 @@ mod tests {
             player_name: "changed-player".to_string(),
             ..Settings::default()
         });
-        let mut buffer = Buffer::empty(Rect::new(0, 0, 80, 5));
+        let mut buffer = Buffer::empty(Rect::new(0, 0, 200, 60));
 
-        app.render_header(buffer.area, &mut buffer);
-        let rendered = buffer
+        (&app).render(buffer.area, &mut buffer);
+        let rendered_lines = buffer
             .content()
+            .chunks(buffer.area.width as usize)
+            .map(|line| line.iter().map(|cell| cell.symbol()).collect::<String>())
+            .collect::<Vec<_>>();
+        let rendered = rendered_lines.join("\n");
+        let header_line = rendered_lines
             .iter()
-            .map(|cell| cell.symbol())
-            .collect::<String>();
+            .find(|line| line.contains(HEADER_NAME))
+            .unwrap();
 
         assert!(rendered.contains(HEADER_NAME));
-        assert!(!rendered.contains("changed-player"));
+        assert!(!header_line.contains("changed-player"));
     }
 }

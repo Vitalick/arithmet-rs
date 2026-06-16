@@ -1,21 +1,19 @@
+use super::Status;
+use crate::domain::banner;
+use crate::domain::session::Session;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
-use crate::domain::banner;
-use crate::domain::expression::ExerciseWithStartTime;
-use crate::domain::session::Session;
-use super::Status;
 
 #[derive(Debug)]
 pub struct BannerWidget<'a> {
     session: &'a Option<Session>,
-    exercise_now: &'a Option<ExerciseWithStartTime>,
     status: &'a Status,
 }
 
 impl<'a> BannerWidget<'a> {
-    pub fn new(session: &'a Option<Session>, exercise_now: &'a Option<ExerciseWithStartTime>, status: &'a Status) -> Self {
-        BannerWidget { session, exercise_now, status }
+    pub fn new(session: &'a Option<Session>, status: &'a Status) -> Self {
+        BannerWidget { session, status }
     }
 }
 

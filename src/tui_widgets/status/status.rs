@@ -27,7 +27,7 @@ impl<'a> StatusWidget<'a> {
         status: &'a Status,
     ) -> Self {
         StatusWidget {
-            banner: BannerWidget::new(session, exercise_now, status),
+            banner: BannerWidget::new(session, status),
             progress: ProgressWidget::new(session, exercise_now, status),
         }
     }
