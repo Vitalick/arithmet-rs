@@ -221,7 +221,7 @@ pub fn highlighted_label(
 ) -> Line<'static> {
     Line::from(vec![
         Span::raw(prefix),
-        highlighted.blue().bold(),
+        highlighted.yellow().bold(),
         Span::raw(suffix),
     ])
 }
@@ -237,7 +237,7 @@ pub fn highlighted_suffix(prefix: &'static str, highlighted: &'static str) -> Li
 
 fn operation_label(operation: Operation) -> Line<'static> {
     Line::from(vec![
-        operation.symbol().blue().bold(),
+        operation.symbol().yellow().bold(),
         " ".into(),
         operation.label().to_lowercase().into(),
     ])

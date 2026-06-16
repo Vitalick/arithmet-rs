@@ -4,7 +4,7 @@ use crate::domain::session::Session;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Modifier, Style};
-use ratatui::widgets::{Gauge, Widget};
+use ratatui::widgets::{Gauge, LineGauge, Widget};
 use std::cmp::{max, min};
 use std::time::Duration;
 
@@ -55,11 +55,11 @@ impl Widget for ProgressWidget<'_> {
         // };
         let label_string = format!("Осталось {}.{:02} сек.", time_left.as_secs(), time_left.as_millis() % Duration::from_secs(1).as_millis() / 10);
         let gauge_style = if time_left <= danger_secs {
-            Style::new().red().on_black()
+            Style::new().red()
         } else if time_left <= warning_secs {
-            Style::new().yellow().on_black()
+            Style::new().yellow()
         } else {
-            Style::new().blue().on_black()
+            Style::new().blue()
         };
         Gauge::default()
             .style(Modifier::BOLD)

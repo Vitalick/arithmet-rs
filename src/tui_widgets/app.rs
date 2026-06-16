@@ -337,15 +337,15 @@ impl Widget for &App {
 impl App {
     fn instructions(&self) -> Line<'static> {
         Line::from(vec![
-            "<+ - * / :>".blue().bold(),
+            "<+ - * / :>".yellow().bold(),
             " - действие, ".into(),
-            "<И О Д К С>".blue().bold(),
+            "<И О Д К С>".yellow().bold(),
             " - поля, ".into(),
-            "<F1>".blue().bold(),
+            "<F1>".yellow().bold(),
             " - результат, ".into(),
-            "<Esc>".blue().bold(),
+            "<Esc>".yellow().bold(),
             " - выход, ".into(),
-            "<Enter>".blue().bold(),
+            "<Enter>".yellow().bold(),
             " - старт".into(),
         ])
     }

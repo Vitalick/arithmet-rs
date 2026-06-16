@@ -39,7 +39,7 @@ impl Widget for StatusWidget<'_> {
             Constraint::Fill(1),
             Constraint::Length(7),
             Constraint::Fill(1),
-            Constraint::Length(2),
+            Constraint::Length(1),
         ])
         .spacing(1)
         .areas(area);
