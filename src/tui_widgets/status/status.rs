@@ -16,10 +16,6 @@ pub enum Status {
 
 #[derive(Debug)]
 pub struct StatusWidget<'a> {
-    session: &'a Option<Session>,
-    exercise_now: &'a Option<ExerciseWithStartTime>,
-    status: &'a Status,
-
     banner: BannerWidget<'a>,
     progress: ProgressWidget<'a>,
 }
@@ -31,9 +27,6 @@ impl<'a> StatusWidget<'a> {
         status: &'a Status,
     ) -> Self {
         StatusWidget {
-            session,
-            exercise_now,
-            status,
             banner: BannerWidget::new(session, exercise_now, status),
             progress: ProgressWidget::new(session, exercise_now, status),
         }
