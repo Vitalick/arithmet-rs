@@ -13,32 +13,34 @@ pub enum Status {
     AwaitingGameContinue,
     GameFinished,
 }
-pub struct StatusWidget {
-    session: Option<Session>,
-    exercise_now: Option<ExerciseWithStartTime>,
-    status: Status,
 
-    banner: BannerWidget,
-    progress: ProgressWidget,
+#[derive(Debug)]
+pub struct StatusWidget<'a> {
+    session: &'a Option<Session>,
+    exercise_now: &'a Option<ExerciseWithStartTime>,
+    status: &'a Status,
+
+    banner: BannerWidget<'a>,
+    progress: ProgressWidget<'a>,
 }
 
-impl StatusWidget {
+impl<'a> StatusWidget<'a> {
     pub fn new(
-        session: Option<Session>,
-        exercise_now: Option<ExerciseWithStartTime>,
-        status: Status,
+        session: &'a Option<Session>,
+        exercise_now: &'a Option<ExerciseWithStartTime>,
+        status: &'a Status,
     ) -> Self {
         StatusWidget {
-            session: session.clone(),
+            session,
             exercise_now,
             status,
-            banner: BannerWidget::new(session.clone(), exercise_now, status),
-            progress: ProgressWidget::new(session.clone(), exercise_now, status),
+            banner: BannerWidget::new(session, exercise_now, status),
+            progress: ProgressWidget::new(session, exercise_now, status),
         }
     }
 }
 
-impl Widget for StatusWidget {
+impl Widget for StatusWidget<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let [_, banner, _, progress] = Layout::vertical([
             Constraint::Fill(1),

@@ -6,19 +6,20 @@ use crate::domain::expression::ExerciseWithStartTime;
 use crate::domain::session::Session;
 use super::Status;
 
-pub struct BannerWidget {
-    session: Option<Session>,
-    exercise_now: Option<ExerciseWithStartTime>,
-    status: Status,
+#[derive(Debug)]
+pub struct BannerWidget<'a> {
+    session: &'a Option<Session>,
+    exercise_now: &'a Option<ExerciseWithStartTime>,
+    status: &'a Status,
 }
 
-impl BannerWidget {
-    pub fn new(session: Option<Session>, exercise_now: Option<ExerciseWithStartTime>, status: Status) -> Self {
+impl<'a> BannerWidget<'a> {
+    pub fn new(session: &'a Option<Session>, exercise_now: &'a Option<ExerciseWithStartTime>, status: &'a Status) -> Self {
         BannerWidget { session, exercise_now, status }
     }
 }
 
-impl Widget for BannerWidget {
+impl Widget for BannerWidget<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let banner_text = match self.status {
             Status::Welcome => "Добро пожаловать!".to_string(),

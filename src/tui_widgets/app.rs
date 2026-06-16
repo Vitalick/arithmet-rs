@@ -30,7 +30,6 @@ const HEADER_NAME: &str = "VIT";
 const MAIN_AREA_HEIGHT: u16 = 16;
 const STATUS_AREA_HEIGHT: u16 = 10;
 
-
 const INPUT_CURSOR: [char; 4] = ['-', '\\', '|', '/'];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,7 +43,7 @@ enum ActiveField {
 }
 
 #[derive(Debug)]
-pub struct App {
+pub struct App<'a> {
     status: Status,
     settings: Settings,
     session: Option<Session>,
@@ -55,17 +54,24 @@ pub struct App {
     input_buffer: String,
     cursor_frame: usize,
     exit: bool,
+
+    status_widget: StatusWidget<'a>,
 }
 
-impl Default for App {
+impl<'a> Default for App<'a> {
     fn default() -> Self {
+        let status = Status::Welcome;
+        let session = None;
+        let exercise_now = None;
+        let status_widget = StatusWidget::new(&session, &exercise_now, &status);
         Self {
-            status: Status::Welcome,
+            status_widget,
+            status,
             settings: Settings::load(CONFIG_PATH).unwrap_or_default(),
-            session: None,
+            session,
             correct_answers: 0,
             active_field: None,
-            exercise_now: None,
+            exercise_now,
             answer: None,
             input_buffer: String::new(),
             cursor_frame: 0,
@@ -327,7 +333,7 @@ impl Widget for &App {
                 .areas(inner);
 
         self.render_main(main_area, buf);
-        StatusWidget::new(self.session.clone(), self.exercise_now, self.status).render(status_area, buf);
+        StatusWidget::new(&self.session, &self.exercise_now, &self.status).render(status_area, buf);
     }
 }
 
@@ -442,7 +448,6 @@ impl App {
             .block(check_block)
             .render(area, buf);
     }
-
 
     fn render_settings_column(&self, area: Rect, buf: &mut Buffer) {
         let [_, settings] =
