@@ -8,7 +8,8 @@ use ratatui::prelude::{Line, Span, Stylize};
 use ratatui::symbols::border;
 use ratatui::widgets::{Block, Paragraph, Widget};
 use strum::IntoEnumIterator;
-use super::cursor;
+use crate::tui_widgets::main::field_line::FieldLineWidget;
+use super::{cursor, CursorType};
 
 pub const HEADER_NAME: &str = "VIT";
 
@@ -181,12 +182,7 @@ impl<'a> MainWidget<'a> {
             self.field_value(field)
         };
 
-        let widget = FieldLineWidget::new(label, value, active, brackets, colon);
-        if active {
-            widget.cursor(cursor::spinner_cursor()).into_line()
-        } else {
-            widget.into_line()
-        }
+        FieldLineWidget::new(label, value, active, brackets, colon, CursorType::Spinner).into_line()
     }
 
     fn field_value(&self, field: ActiveField) -> String {
@@ -215,62 +211,6 @@ impl Widget for MainWidget<'_> {
         self.render_actions_column(left, buf);
         self.render_center_column(center, buf);
         self.render_settings_column(right, buf);
-    }
-}
-
-#[derive(Debug)]
-pub struct FieldLineWidget<'a> {
-    label: Line<'a>,
-    value: String,
-    active: bool,
-    brackets: bool,
-    colon: bool,
-    cursor: String,
-}
-
-impl<'a> FieldLineWidget<'a> {
-    pub fn new(label: Line<'a>, value: String, active: bool, brackets: bool, colon: bool) -> Self {
-        Self {
-            label,
-            value,
-            active,
-            brackets,
-            colon,
-            cursor: String::new(),
-        }
-    }
-
-    pub fn cursor(mut self, cursor: String) -> Self {
-        self.cursor = cursor;
-        self
-    }
-
-    pub fn into_line(self) -> Line<'a> {
-        let mut spans = self.label.spans;
-        if self.colon {
-            spans.push(Span::raw(":"));
-        }
-        spans.push(Span::raw(" "));
-
-        let value = if self.brackets {
-            format!("[ {}{} ]", self.value, self.cursor)
-        } else {
-            format!("{}{}", self.value, self.cursor)
-        };
-
-        let value = if self.active {
-            value.blue().bold()
-        } else {
-            Span::raw(value)
-        };
-        spans.push(value);
-        Line::from(spans)
-    }
-}
-
-impl Widget for FieldLineWidget<'_> {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        self.into_line().render(area, buf);
     }
 }
 
