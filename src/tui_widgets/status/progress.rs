@@ -48,11 +48,6 @@ impl Widget for ProgressWidget<'_> {
             / session.settings.limits.answer_time.as_millis() as f64;
         let warning_secs = Duration::from_secs(5);
         let danger_secs = Duration::from_secs(2);
-        // let label_string = if time_left <= danger_secs {
-        //     format!("Осталось {}.{:02} сек.", time_left.as_secs(), time_left.as_millis() % Duration::from_secs(1).as_millis() / 10)
-        // } else {
-        //     format!("Осталось {} сек.", time_left.as_secs()+1)
-        // };
         let label_string = format!("Осталось {}.{:02} сек.", time_left.as_secs(), time_left.as_millis() % Duration::from_secs(1).as_millis() / 10);
         let gauge_style = if time_left <= danger_secs {
             Style::new().red()

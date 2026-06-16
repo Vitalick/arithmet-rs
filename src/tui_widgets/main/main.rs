@@ -8,6 +8,7 @@ use ratatui::prelude::{Line, Span, Stylize};
 use ratatui::symbols::border;
 use ratatui::widgets::{Block, Paragraph, Widget};
 use strum::IntoEnumIterator;
+use crate::domain::expression::ExerciseWithStartTime;
 use crate::tui_widgets::main::field_line::FieldLineWidget;
 use super::{cursor, CursorType};
 
@@ -19,6 +20,7 @@ pub struct MainWidget<'a> {
     correct_answers: usize,
     active_field: Option<ActiveField>,
     input_buffer: &'a str,
+    exercise_now: &'a Option<ExerciseWithStartTime>,
 }
 
 impl<'a> MainWidget<'a> {
@@ -27,12 +29,14 @@ impl<'a> MainWidget<'a> {
         correct_answers: usize,
         active_field: Option<ActiveField>,
         input_buffer: &'a str,
+        exercise_now: &'a Option<ExerciseWithStartTime>,
     ) -> Self {
         Self {
             settings,
             correct_answers,
             active_field,
             input_buffer,
+            exercise_now,
         }
     }
 
@@ -92,7 +96,11 @@ impl<'a> MainWidget<'a> {
             .title_bottom(
                 Line::from(format!("Верных ответов: {}", self.correct_answers).bold()).centered(),
             );
-        Paragraph::new("").block(exercise_block).render(area, buf);
+        let exercise = match self.exercise_now {
+            Some(exercise_now) => Paragraph::new(format!("{} = {}{}", exercise_now.exercise, self.input_buffer, CursorType::Spinner).to_string()),
+            None => Paragraph::new(""),
+        };
+        exercise.block(exercise_block).render(area, buf);
     }
 
     fn render_check(&self, area: Rect, buf: &mut Buffer) {

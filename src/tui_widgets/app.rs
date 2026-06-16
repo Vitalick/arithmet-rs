@@ -226,10 +226,7 @@ impl App {
             ActiveField::ResultMax => self.settings.limits.result_max.to_string(),
             ActiveField::ExerciseCount => self.settings.limits.exercise_count.to_string(),
             ActiveField::Complexity => self.settings.limits.answer_time.as_secs().to_string(),
-            ActiveField::GameAnswer => match self.answer.unwrap_or_default().entered {
-                Ok(value) => value.to_string(),
-                Err(_) => String::default(),
-            },
+            ActiveField::GameAnswer => String::default(),
         }
     }
 
@@ -328,6 +325,7 @@ impl Widget for &App {
             self.correct_answers,
             self.active_field,
             &self.input_buffer,
+            &self.exercise_now,
         )
         .render(main_area, buf);
         StatusWidget::new(&self.session, &self.exercise_now, &self.status).render(status_area, buf);
