@@ -29,11 +29,11 @@ impl StatusWidget {
         status: Status,
     ) -> Self {
         StatusWidget {
-            session,
+            session: session.clone(),
             exercise_now,
             status,
-            banner: BannerWidget::new(session, exercise_now, status),
-            progress: ProgressWidget::new(session, exercise_now, status),
+            banner: BannerWidget::new(session.clone(), exercise_now, status),
+            progress: ProgressWidget::new(session.clone(), exercise_now, status),
         }
     }
 }

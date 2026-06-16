@@ -25,6 +25,7 @@ use crate::domain::answer::{Answer, AnswerError};
 use crate::domain::expression::ExerciseWithStartTime;
 use crate::domain::session::Session;
 use crate::domain::{banner, operation::Operation, settings::Settings};
+use crate::tui_widgets::status::{Status, StatusWidget};
 
 const CONFIG_PATH: &str = "arithmet.toml";
 const HEADER_NAME: &str = "VIT";
@@ -328,7 +329,7 @@ impl Widget for &App {
                 .areas(inner);
 
         self.render_main(main_area, buf);
-        self.render_status(status_area, buf);
+        StatusWidget::new(self.session.clone(), self.exercise_now, self.status).render(status_area, buf);
     }
 }
 

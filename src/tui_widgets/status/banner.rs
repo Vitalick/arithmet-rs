@@ -4,7 +4,6 @@ use ratatui::widgets::Widget;
 use crate::domain::banner;
 use crate::domain::expression::ExerciseWithStartTime;
 use crate::domain::session::Session;
-use crate::tui_widgets::status::progress::ProgressWidget;
 use super::Status;
 
 pub struct BannerWidget {
