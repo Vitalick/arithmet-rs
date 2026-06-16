@@ -44,14 +44,6 @@ enum ActiveField {
     GameAnswer,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Status {
-    Welcome,
-    AwaitingAnswer,
-    AwaitingGameContinue,
-    GameFinished,
-}
-
 #[derive(Debug)]
 pub struct App {
     status: Status,

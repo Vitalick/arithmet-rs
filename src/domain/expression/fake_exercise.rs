@@ -1,5 +1,5 @@
 use std::fmt::{Display, Formatter};
-use crate::domain::expression::Expression;
+use super::expression::Expression;
 use crate::domain::operation::Operation;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,5 +1,5 @@
 use std::fmt::{Display, Formatter};
-use crate::domain::expression::Expression;
+use super::expression::Expression;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Comparison {

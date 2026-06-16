@@ -1,6 +1,6 @@
-use crate::domain::expression::Expression;
-use crate::domain::expression::comparison::Comparison;
-use crate::domain::expression::fake_exercise::FakeExercise;
+use super::Expression;
+use super::comparison::Comparison;
+use super::fake_exercise::FakeExercise;
 use crate::domain::operation::Operation;
 use crate::domain::settings::Settings;
 use rand::random_range;

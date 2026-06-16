@@ -1,6 +1,6 @@
-pub mod exercise;
+mod exercise;
 mod fake_exercise;
 mod comparison;
-pub mod expression;
-pub use expression::*;
-pub use exercise::*;
+mod expression;
+pub use expression::Expression;
+pub use exercise::{Exercise, ExerciseWithStartTime};
