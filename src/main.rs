@@ -3,8 +3,8 @@ use std::sync::{
     atomic::AtomicBool,
 };
 
-use arithmet::app::App;
 use color_eyre::{Result, eyre::WrapErr};
+use arithmet::tui_widgets::app::App;
 
 #[cfg(unix)]
 fn install_signal_handler(shutdown_requested: Arc<AtomicBool>) -> Result<()> {

@@ -3,7 +3,8 @@ use std::fs;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use arithmet::domain::operation::Operation;
-use arithmet::domain::session::{Answer, Session};
+use arithmet::domain::session::Session;
+use arithmet::domain::answer::Answer;
 use arithmet::domain::settings::{Limits, Settings};
 use serde_json::Value;
 
