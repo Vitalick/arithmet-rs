@@ -1,7 +1,5 @@
 use color_eyre::{Result, eyre::WrapErr};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use ratatui::style::{Modifier, Style};
-use ratatui::widgets::Gauge;
 use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
@@ -24,7 +22,7 @@ use validations::Validate;
 use crate::domain::answer::{Answer, AnswerError};
 use crate::domain::expression::ExerciseWithStartTime;
 use crate::domain::session::Session;
-use crate::domain::{banner, operation::Operation, settings::Settings};
+use crate::domain::{operation::Operation, settings::Settings};
 use crate::tui_widgets::status::{Status, StatusWidget};
 
 const CONFIG_PATH: &str = "arithmet.toml";
@@ -445,68 +443,6 @@ impl App {
             .render(area, buf);
     }
 
-    fn render_status(&self, area: Rect, buf: &mut Buffer) {
-        let [_, banner, _, progress] = Layout::vertical([
-            Constraint::Fill(1),
-            Constraint::Length(7),
-            Constraint::Fill(1),
-            Constraint::Length(2),
-        ])
-        .spacing(1)
-        .areas(area);
-
-        self.render_banner(banner, buf);
-        self.render_progress(progress, buf);
-    }
-
-    fn render_banner(&self, area: Rect, buf: &mut Buffer) {
-        let banner_text = match self.status {
-            Status::Welcome => "Добро пожаловать!".to_string(),
-            Status::AwaitingGameContinue => self.session.as_ref().unwrap().last_answer_banner(),
-            Status::GameFinished => {
-                format!(
-                    "Ваша оценка: {}",
-                    self.session.as_ref().unwrap().get_grade()
-                )
-            }
-            _ => String::default(),
-        };
-        if banner_text.is_empty() {
-            return;
-        }
-
-        let banner_paragraph = banner::render_to_paragraph(banner_text.as_str());
-
-        banner_paragraph.centered().render(area, buf);
-    }
-
-    fn render_progress(&self, area: Rect, buf: &mut Buffer) {
-        match self.status {
-            Status::Welcome | Status::GameFinished => return,
-            _ => {}
-        }
-        let session = self.session.as_ref().unwrap();
-        let exercise_now = self.exercise_now.as_ref().unwrap();
-        let time_elapsed = exercise_now.start_time.elapsed();
-        let time_left = session.settings.limits.answer_time - time_elapsed;
-        if time_left <= Duration::ZERO {
-            Gauge::default()
-                .style(Modifier::BOLD)
-                .gauge_style(Style::new().red().on_black())
-                .percent(100)
-                .render(area, buf);
-            return;
-        }
-        Gauge::default()
-            .style(Modifier::BOLD)
-            .gauge_style(Style::new().blue().on_black())
-            .label(format!("Осталось {:?} сек.", time_left.as_secs()))
-            .percent(
-                (time_elapsed.as_millis() * 100 / session.settings.limits.answer_time.as_millis())
-                    as u16,
-            )
-            .render(area, buf);
-    }
 
     fn render_settings_column(&self, area: Rect, buf: &mut Buffer) {
         let [_, settings] =
