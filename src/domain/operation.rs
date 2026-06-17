@@ -106,7 +106,7 @@ impl Operation {
         self.symbol().to_string()
     }
 
-    pub fn validates_operands(&self, _left: i32, right: i32) -> Result<(), String> {
+    pub fn validates_operands(&self, _left: i64, right: i64) -> Result<(), String> {
         match self {
             Operation::Division | Operation::DivisionWithRemainder => {
                 if right != 0 {
@@ -118,7 +118,7 @@ impl Operation {
         }
     }
 
-    pub fn calculate(&self, left: i32, right: i32) -> Result<i32, String> {
+    pub fn calculate(&self, left: i64, right: i64) -> Result<i64, String> {
         self.validates_operands(left, right)?;
 
         match self {
@@ -130,7 +130,7 @@ impl Operation {
         }
     }
 
-    pub fn calculate_remainder(&self, left: i32, right: i32) -> Result<i32, String> {
+    pub fn calculate_remainder(&self, left: i64, right: i64) -> Result<i64, String> {
         self.validates_operands(left, right)?;
 
         if matches!(self, Operation::Division | Operation::DivisionWithRemainder) {
@@ -139,7 +139,7 @@ impl Operation {
         Ok(0)
     }
 
-    pub fn calculate_str(&self, left: i32, right: i32) -> Result<String, String> {
+    pub fn calculate_str(&self, left: i64, right: i64) -> Result<String, String> {
         self.validates_operands(left, right)?;
 
         let result = self.calculate(left, right)?;

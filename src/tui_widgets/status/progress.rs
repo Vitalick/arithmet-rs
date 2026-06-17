@@ -12,14 +12,14 @@ use std::time::Duration;
 pub struct ProgressWidget<'a> {
     session: &'a Option<Session>,
     exercise_now: &'a Option<ExerciseWithStartTime>,
-    status: &'a Status,
+    status: Status,
 }
 
 impl<'a> ProgressWidget<'a> {
     pub fn new(
         session: &'a Option<Session>,
         exercise_now: &'a Option<ExerciseWithStartTime>,
-        status: &'a Status,
+        status: Status,
     ) -> Self {
         ProgressWidget {
             session,

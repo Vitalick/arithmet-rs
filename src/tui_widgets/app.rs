@@ -16,6 +16,7 @@ use std::{
     },
     time::Duration,
 };
+use std::cmp::{max, min};
 use validations::Validate;
 
 use crate::domain::answer::{Answer, AnswerError};
@@ -113,11 +114,56 @@ impl App {
     }
 
     fn game_step(&mut self) -> Result<(), String> {
-        let session = self.session.as_mut().unwrap();
-        if session.have_next() {
-            self.exercise_now = Some(session.next()?);
+        match self.session.as_mut() {
+            None => return Err("session is not set".to_string()),
+            Some(session) => {
+                if session.is_finished() {
+                    return Ok(());
+                }
+                match self.exercise_now {
+                    Some(exercise_now) => {
+                        if exercise_now.start_time.elapsed() > session.settings.limits.answer_time {
+                            if matches!(self.active_field, Some(ActiveField::GameAnswer)) {
+                                self.cancel_input();
+                            }
+                            self.answer(Err(AnswerError::TimedOut));
+                            return Ok(());
+                        }
+                    }
+                    None =>
+                        if session.have_next() {
+                            self.exercise_now = Some(session.next()?);
+                            self.answer = None;
+                        }
+                }
+            }
         }
         Ok(())
+    }
+
+    fn answer(&mut self, entered: Result<i64, AnswerError>) {
+        let exercise_now = self.exercise_now.unwrap();
+        let elapsed = exercise_now.start_time.elapsed();
+        let session = self.session.as_mut().unwrap();
+
+        let entered = if matches!(entered, Ok(_)) && elapsed > session.settings.limits.answer_time {
+            Err(AnswerError::TimedOut)
+        } else {
+            entered
+        };
+        self.answer = Some(Answer {
+            exercise: exercise_now.exercise,
+            entered,
+            time_elapsed: min(session.settings.limits.answer_time, elapsed),
+        });
+        session.add_answer(self.answer.unwrap()).unwrap();
+    }
+
+    fn answer_str(&mut self, entered: String) {
+        match entered.parse() {
+            Ok(value) => self.answer(Ok(value)),
+            _ => self.answer(Err(AnswerError::InvalidInput)),
+        }
     }
 
     fn render_frame(&self, frame: &mut Frame) {
@@ -186,22 +232,8 @@ impl App {
                 }
             }
             ActiveField::GameAnswer => {
-                let exercise = self.exercise_now.unwrap();
-                if let Ok(value) = value.parse() {
-                    self.answer = Some(Answer {
-                        exercise: exercise.exercise,
-                        entered: Ok(value),
-                        time_elapsed: exercise.start_time.elapsed(),
-                    });
-                } else {
-                    self.answer = Some(Answer {
-                        exercise: exercise.exercise,
-                        entered: Err(AnswerError::InvalidInput),
-                        time_elapsed: exercise.start_time.elapsed(),
-                    });
-                    self.cancel_input();
-                    return;
-                }
+                self.answer_str(value.to_string());
+                return ;
             }
             ActiveField::Complexity => {
                 if let Ok(value) = value.parse::<u64>() {
@@ -232,10 +264,37 @@ impl App {
 
     fn handle_input_key_event(&mut self, key_event: KeyEvent) -> bool {
         if self.active_field.is_none() {
-            if key_event.code == KeyCode::Enter {
-                self.start_game().unwrap();
-                self.start_input(ActiveField::GameAnswer);
-                return true;
+            match self.status {
+                Status::Welcome | Status::GameFinished => {
+                    if key_event.code == KeyCode::Enter {
+                        self.start_game().unwrap();
+                        self.start_input(ActiveField::GameAnswer);
+                        return true;
+                    }
+                }
+                Status::AwaitingGameContinue => {
+                    match key_event.code {
+                        KeyCode::Enter | KeyCode::Tab => {
+                            self.exercise_now = None;
+                            self.start_input(ActiveField::GameAnswer);
+                            return true;
+
+                        }
+                        KeyCode::F(10) | KeyCode::Esc => {
+                            self.session = None;
+                            self.exercise_now = None;
+                            self.correct_answers = 0;
+                            self.status = Status::Welcome;
+                        }
+                        _ => ()
+                    }
+                    if key_event.code == KeyCode::Enter {
+                        self.start_game().unwrap();
+                        self.start_input(ActiveField::GameAnswer);
+                        return true;
+                    }
+                },
+                _ => ()
             }
             return false;
         }
@@ -251,8 +310,8 @@ impl App {
                 if self.active_field == Some(ActiveField::PlayerName)
                     || character.is_ascii_digit()
                     || (character == '-'
-                        && self.input_buffer.is_empty()
-                        && matches!(
+                    && self.input_buffer.is_empty()
+                    && matches!(
                             self.active_field,
                             Some(ActiveField::ResultMin | ActiveField::ResultMax)
                         ))
@@ -318,7 +377,7 @@ impl Widget for &App {
             Constraint::Length(MAIN_AREA_HEIGHT),
             Constraint::Min(STATUS_AREA_HEIGHT),
         ])
-        .areas(inner);
+            .areas(inner);
 
         MainWidget::new(
             &self.settings,
@@ -327,8 +386,8 @@ impl Widget for &App {
             &self.input_buffer,
             &self.exercise_now,
         )
-        .render(main_area, buf);
-        StatusWidget::new(&self.session, &self.exercise_now, &self.status).render(status_area, buf);
+            .render(main_area, buf);
+        StatusWidget::new(&self.session, &self.exercise_now, self.status).render(status_area, buf);
     }
 }
 

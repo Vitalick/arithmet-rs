@@ -6,8 +6,8 @@ use validations::{Error, Errors, Validate};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Limits {
-    pub result_min: i32,
-    pub result_max: i32,
+    pub result_min: i64,
+    pub result_max: i64,
     pub exercise_count: usize,
     #[serde(with = "humantime_serde")]
     pub answer_time: std::time::Duration,

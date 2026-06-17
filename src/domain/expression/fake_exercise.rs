@@ -4,15 +4,15 @@ use crate::domain::operation::Operation;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FakeExercise {
-    pub left: i32,
+    pub left: i64,
     pub operation: Operation,
-    pub right: i32,
-    pub answer: i32,
-    pub remainder: i32,
+    pub right: i64,
+    pub answer: i64,
+    pub remainder: i64,
 }
 
 impl FakeExercise {
-    pub fn new(left: i32, operation: Operation, right: i32, answer: i32) -> Self {
+    pub fn new(left: i64, operation: Operation, right: i64, answer: i64) -> Self {
         FakeExercise {
             left,
             operation,
@@ -23,11 +23,11 @@ impl FakeExercise {
     }
 
     pub fn new_with_remainer(
-        left: i32,
+        left: i64,
         operation: Operation,
-        right: i32,
-        answer: i32,
-        remainder: i32,
+        right: i64,
+        answer: i64,
+        remainder: i64,
     ) -> Self {
         FakeExercise {
             left,
@@ -38,11 +38,11 @@ impl FakeExercise {
         }
     }
 
-    pub fn with_remainder(self, remainder: i32) -> Self {
+    pub fn with_remainder(self, remainder: i64) -> Self {
         FakeExercise { remainder, ..self }
     }
 
-    pub fn with_answer(self, answer: i32) -> Self {
+    pub fn with_answer(self, answer: i64) -> Self {
         FakeExercise { answer, ..self }
     }
 }

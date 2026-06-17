@@ -8,11 +8,11 @@ use ratatui::widgets::Widget;
 #[derive(Debug)]
 pub struct BannerWidget<'a> {
     session: &'a Option<Session>,
-    status: &'a Status,
+    status: Status,
 }
 
 impl<'a> BannerWidget<'a> {
-    pub fn new(session: &'a Option<Session>, status: &'a Status) -> Self {
+    pub fn new(session: &'a Option<Session>, status: Status) -> Self {
         BannerWidget { session, status }
     }
 }

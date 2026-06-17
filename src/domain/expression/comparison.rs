@@ -3,12 +3,12 @@ use super::expression::Expression;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Comparison {
-    pub left: i32,
-    pub right: i32,
+    pub left: i64,
+    pub right: i64,
 }
 
 impl Comparison {
-    pub fn new(left: i32, right: i32) -> Self {
+    pub fn new(left: i64, right: i64) -> Self {
         Comparison { left, right }
     }
 }

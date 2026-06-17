@@ -9,9 +9,9 @@ use std::time::Instant;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Exercise {
-    pub left: i32,
+    pub left: i64,
     pub operation: Operation,
-    pub right: i32,
+    pub right: i64,
 }
 
 impl Expression for Exercise {
@@ -29,7 +29,7 @@ impl Display for Exercise {
 }
 
 impl Exercise {
-    pub fn new(left: i32, operation: Operation, right: i32) -> Self {
+    pub fn new(left: i64, operation: Operation, right: i64) -> Self {
         Exercise {
             left,
             operation,
@@ -44,7 +44,7 @@ impl Exercise {
         Ok(())
     }
 
-    fn unsafe_random(operation: Operation, result_min: i32, result_max: i32) -> Self {
+    fn unsafe_random(operation: Operation, result_min: i64, result_max: i64) -> Self {
         match operation {
             Operation::Addition => {
                 let result = random_range(result_min..result_max);
@@ -147,8 +147,8 @@ impl Exercise {
 
     pub fn random(
         operation: Operation,
-        result_min: i32,
-        result_max: i32,
+        result_min: i64,
+        result_max: i64,
     ) -> Result<Exercise, String> {
         if result_max - result_min < 50 {
             return Err(
@@ -167,15 +167,15 @@ impl Exercise {
         }
     }
 
-    pub fn expected(&self) -> Result<i32, String> {
+    pub fn expected(&self) -> Result<i64, String> {
         self.operation.calculate(self.left, self.right)
     }
 
-    pub fn compare(&self, value: i32) -> Result<bool, String> {
+    pub fn compare(&self, value: i64) -> Result<bool, String> {
         Ok(self.expected()? == value)
     }
 
-    pub fn expected_remainder(&self) -> Result<i32, String> {
+    pub fn expected_remainder(&self) -> Result<i64, String> {
         self.operation.calculate_remainder(self.left, self.right)
     }
 
@@ -187,7 +187,7 @@ impl Exercise {
         self.operation.validates_operands(self.left, self.right)
     }
 
-    pub fn check_expressions(&self, entered: i32) -> Result<[Box<dyn Expression>; 2], String> {
+    pub fn check_expressions(&self, entered: i64) -> Result<[Box<dyn Expression>; 2], String> {
         if entered == 0 {
             return Err("Ответ не должен быть нулём".to_string());
         }
@@ -235,7 +235,7 @@ impl Exercise {
 }
 
 impl Operation {
-    pub fn make_exercise(&self, left: i32, right: i32) -> Exercise {
+    pub fn make_exercise(&self, left: i64, right: i64) -> Exercise {
         Exercise::new(left, *self, right)
     }
 }
@@ -276,11 +276,11 @@ mod tests {
     use super::*;
     use crate::domain::expression::Expression;
 
-    const RANDOM_MIN: i32 = 100;
-    const RANDOM_MAX: i32 = 150;
+    const RANDOM_MIN: i64 = 100;
+    const RANDOM_MAX: i64 = 150;
     const RANDOM_SAMPLES: usize = 50;
 
-    fn checked_expressions(exercise: Exercise, entered: i32) -> Result<Vec<String>, String> {
+    fn checked_expressions(exercise: Exercise, entered: i64) -> Result<Vec<String>, String> {
         exercise
             .check_expressions(entered)?
             .into_iter()
@@ -288,7 +288,7 @@ mod tests {
             .collect()
     }
 
-    fn assert_check_error(exercise: Exercise, entered: i32, expected: &str) {
+    fn assert_check_error(exercise: Exercise, entered: i64, expected: &str) {
         match exercise.check_expressions(entered) {
             Ok(_) => panic!("expected error: {expected}"),
             Err(error) => assert_eq!(error, expected),
@@ -305,7 +305,7 @@ mod tests {
         Exercise::random(operation, RANDOM_MIN, RANDOM_MAX).unwrap()
     }
 
-    fn print_check_result(exercise: Exercise, answer_kind: &str, answer: i32) {
+    fn print_check_result(exercise: Exercise, answer_kind: &str, answer: i64) {
         println!("    {answer_kind} answer {answer}:");
 
         match exercise.check_expressions(answer) {

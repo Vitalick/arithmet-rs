@@ -12,7 +12,7 @@ pub enum AnswerError {
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Answer {
     pub exercise: Exercise,
-    pub entered: Result<i32, AnswerError>,
+    pub entered: Result<i64, AnswerError>,
 
     #[serde(with = "humantime_serde")]
     pub time_elapsed: std::time::Duration,
