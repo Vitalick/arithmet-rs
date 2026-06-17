@@ -157,6 +157,7 @@ impl App {
             time_elapsed: min(session.settings.limits.answer_time, elapsed),
         });
         session.add_answer(self.answer.unwrap()).unwrap();
+        self.session = Some(session.clone());
     }
 
     fn answer_str(&mut self, entered: String) {
@@ -233,6 +234,7 @@ impl App {
             }
             ActiveField::GameAnswer => {
                 self.answer_str(value.to_string());
+                self.cancel_input();
                 return ;
             }
             ActiveField::Complexity => {
