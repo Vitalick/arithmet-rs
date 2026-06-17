@@ -387,7 +387,7 @@ impl Widget for &App {
             &self.exercise_now,
         )
             .render(main_area, buf);
-        StatusWidget::new(&self.session, &self.exercise_now, self.status).render(status_area, buf);
+        StatusWidget::new(&self.session, &self.exercise_now, self.status, self.active_field).render(status_area, buf);
     }
 }
 

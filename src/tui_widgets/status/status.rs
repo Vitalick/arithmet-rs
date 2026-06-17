@@ -5,8 +5,9 @@ use crate::domain::session::Session;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::Line;
-use ratatui::widgets::Widget;
+use ratatui::widgets::{Paragraph, Widget};
 use strum_macros::Display;
+use crate::tui_widgets::app::ActiveField;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 pub enum Status {
@@ -21,6 +22,7 @@ pub struct StatusWidget<'a> {
     banner: BannerWidget<'a>,
     progress: ProgressWidget<'a>,
     status: Status,
+    active_field: Option<ActiveField>,
 }
 
 impl<'a> StatusWidget<'a> {
@@ -28,11 +30,13 @@ impl<'a> StatusWidget<'a> {
         session: &'a Option<Session>,
         exercise_now: &'a Option<ExerciseWithStartTime>,
         status: Status,
+        active_field: Option<ActiveField>
     ) -> Self {
         StatusWidget {
             banner: BannerWidget::new(session, status),
             progress: ProgressWidget::new(session, exercise_now, status),
             status,
+            active_field
         }
     }
 }
@@ -47,7 +51,11 @@ impl Widget for StatusWidget<'_> {
         ])
         .spacing(1)
         .areas(area);
-        Line::from(self.status.to_string()).render(status, buf);
+        Paragraph::new(vec![
+            Line::from(self.status.to_string()),
+            Line::from(format!("{:?}", self.active_field)),
+        ])
+        .render(status, buf);
         self.banner.render(banner, buf);
         self.progress.render(progress, buf);
     }
