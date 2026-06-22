@@ -1,4 +1,5 @@
-use crate::domain::answer::Answer;
+use std::cmp::min;
+use crate::domain::answer::{Answer, AnswerError};
 use crate::domain::grade::Grade;
 use crate::domain::settings::Settings;
 use std::fmt::Write as _;
@@ -13,6 +14,10 @@ pub struct Session {
     answers: Vec<Answer>,
     correct_answers: usize,
     grade: Grade,
+    #[serde(skip)]
+    exercise_now: Option<ExerciseWithStartTime>,
+    #[serde(skip)]
+    last_answer: Option<Answer>,
 }
 
 impl Session {
@@ -23,6 +28,8 @@ impl Session {
                 answers: Vec::new(),
                 correct_answers: 0,
                 grade: Grade::default(),
+                exercise_now: None,
+                last_answer: None
             }),
             Err(e) => Err(e.to_string()),
         }
@@ -43,7 +50,25 @@ impl Session {
         self.grade = Grade::from_quantity(self.correct_answers, self.answers.len());
     }
 
-    pub fn add_answer(&mut self, answer: Answer) -> Result<(), String> {
+    pub fn answer(&mut self, entered: color_eyre::Result<i64, AnswerError>) {
+        let exercise_now = self.exercise_now.unwrap();
+        let elapsed = exercise_now.start_time.elapsed();
+
+        let entered = if matches!(entered, Ok(_)) && elapsed > self.settings.limits.answer_time {
+            Err(AnswerError::TimedOut)
+        } else {
+            entered
+        };
+        let answer = Answer {
+            exercise: exercise_now.exercise,
+            entered,
+            time_elapsed: min(self.settings.limits.answer_time, elapsed),
+        };
+        self.add_answer(answer).unwrap();
+        self.last_answer = Some(answer);
+    }
+
+    fn add_answer(&mut self, answer: Answer) -> Result<(), String> {
         if !self.have_next() {
             return Err("Достигнут максимум количества ответов".to_string());
         }
@@ -393,6 +418,8 @@ mod tests {
             answers: vec![answer(), failed_answer(AnswerError::Escaped)],
             correct_answers: 1,
             grade: Grade::Three,
+            last_answer: None,
+            exercise_now: None
         };
 
         let serialized = serde_json::to_string(&session).unwrap();

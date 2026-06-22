@@ -126,7 +126,7 @@ impl App {
                             if matches!(self.active_field, Some(ActiveField::GameAnswer)) {
                                 self.cancel_input();
                             }
-                            self.answer(Err(AnswerError::TimedOut));
+                            session.answer(Err(AnswerError::TimedOut));
                             return Ok(());
                         }
                     }
@@ -141,29 +141,12 @@ impl App {
         Ok(())
     }
 
-    fn answer(&mut self, entered: Result<i64, AnswerError>) {
-        let exercise_now = self.exercise_now.unwrap();
-        let elapsed = exercise_now.start_time.elapsed();
-        let session = self.session.as_mut().unwrap();
-
-        let entered = if matches!(entered, Ok(_)) && elapsed > session.settings.limits.answer_time {
-            Err(AnswerError::TimedOut)
-        } else {
-            entered
-        };
-        self.answer = Some(Answer {
-            exercise: exercise_now.exercise,
-            entered,
-            time_elapsed: min(session.settings.limits.answer_time, elapsed),
-        });
-        session.add_answer(self.answer.unwrap()).unwrap();
-        self.session = Some(session.clone());
-    }
-
     fn answer_str(&mut self, entered: String) {
-        match entered.parse() {
-            Ok(value) => self.answer(Ok(value)),
-            _ => self.answer(Err(AnswerError::InvalidInput)),
+        if let Some(session) = self.session.as_mut() {
+            match entered.parse() {
+                Ok(value) => session.answer(Ok(value)),
+                _ => session.answer(Err(AnswerError::InvalidInput)),
+            }
         }
     }
 
