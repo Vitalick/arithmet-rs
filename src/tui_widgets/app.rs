@@ -123,10 +123,10 @@ impl App {
                 match self.exercise_now {
                     Some(exercise_now) => {
                         if exercise_now.start_time.elapsed() > session.settings.limits.answer_time {
+                            session.answer(Err(AnswerError::TimedOut));
                             if matches!(self.active_field, Some(ActiveField::GameAnswer)) {
                                 self.cancel_input();
                             }
-                            session.answer(Err(AnswerError::TimedOut));
                             return Ok(());
                         }
                     }
