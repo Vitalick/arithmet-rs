@@ -3,6 +3,7 @@ use crate::domain::banner;
 use crate::domain::session::Session;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::Style;
 use ratatui::widgets::Widget;
 
 #[derive(Debug)]
@@ -16,6 +17,7 @@ impl<'a> BannerWidget<'a> {
         BannerWidget { session, status }
     }
 }
+
 
 impl Widget for BannerWidget<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
