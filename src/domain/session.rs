@@ -15,7 +15,7 @@ pub enum StepResult {
     Finished,
 }
 
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Session {
     pub settings: Settings,
     answers: Vec<Answer>,
@@ -26,6 +26,20 @@ pub struct Session {
     #[serde(skip)]
     pub last_answer: Option<Answer>,
     interrupted: bool,
+}
+
+impl Default for Session {
+    fn default() -> Self {
+        Self {
+            settings: Settings::default(),
+            answers: Vec::new(),
+            correct_answers: 0,
+            grade: Grade::default(),
+            exercise_now: None,
+            last_answer: None,
+            interrupted: false,
+        }
+    }
 }
 
 impl Session {

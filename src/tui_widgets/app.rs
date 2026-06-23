@@ -345,12 +345,14 @@ impl Widget for &App {
         ])
         .areas(inner);
 
+        let session = self.session.as_ref().unwrap_or_default();
+
         MainWidget::new(
             &self.settings,
-            self.session.as_ref().unwrap_or_default().correct_answers,
+            session.correct_answers,
             self.active_field,
             &self.input_buffer,
-            &self.session.as_ref().unwrap().exercise_now,
+            &session.exercise_now,
         )
         .render(main_area, buf);
         StatusWidget::new(
