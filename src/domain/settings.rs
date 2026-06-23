@@ -4,7 +4,7 @@ use std::path::Path;
 use strum::IntoEnumIterator;
 use validations::{Error, Errors, Validate};
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Limits {
     pub result_min: i64,
     pub result_max: i64,

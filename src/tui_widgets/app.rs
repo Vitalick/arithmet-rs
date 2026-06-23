@@ -345,7 +345,8 @@ impl Widget for &App {
         ])
         .areas(inner);
 
-        let session = self.session.as_ref().unwrap_or_default();
+        let def_session = Session::default();
+        let session = self.session.as_ref().unwrap_or_else(|| &def_session);
 
         MainWidget::new(
             &self.settings,
