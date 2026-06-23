@@ -1,23 +1,31 @@
-use std::cmp::min;
 use crate::domain::answer::{Answer, AnswerError};
+use crate::domain::expression::ExerciseWithStartTime;
 use crate::domain::grade::Grade;
 use crate::domain::settings::Settings;
+use std::cmp::min;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use time::OffsetDateTime;
 use validations::Validate;
-use crate::domain::expression::ExerciseWithStartTime;
+
+pub enum StepResult {
+    TimedOut,
+    Nothing,
+    ExerciseCreated,
+    Finished,
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Session {
     pub settings: Settings,
     answers: Vec<Answer>,
-    correct_answers: usize,
+    pub correct_answers: usize,
     grade: Grade,
     #[serde(skip)]
-    exercise_now: Option<ExerciseWithStartTime>,
+    pub exercise_now: Option<ExerciseWithStartTime>,
     #[serde(skip)]
-    last_answer: Option<Answer>,
+    pub last_answer: Option<Answer>,
+    interrupted: bool,
 }
 
 impl Session {
@@ -29,7 +37,8 @@ impl Session {
                 correct_answers: 0,
                 grade: Grade::default(),
                 exercise_now: None,
-                last_answer: None
+                last_answer: None,
+                interrupted: false,
             }),
             Err(e) => Err(e.to_string()),
         }
@@ -50,7 +59,7 @@ impl Session {
         self.grade = Grade::from_quantity(self.correct_answers, self.answers.len());
     }
 
-    pub fn answer(&mut self, entered: color_eyre::Result<i64, AnswerError>) {
+    pub fn answer(&mut self, entered: Result<i64, AnswerError>) {
         let exercise_now = self.exercise_now.unwrap();
         let elapsed = exercise_now.start_time.elapsed();
 
@@ -83,6 +92,33 @@ impl Session {
         Ok(())
     }
 
+    pub fn prepare_next_exercise(&mut self) -> Result<(), String> {
+        self.exercise_now = None;
+        Ok(())
+    }
+
+    pub fn game_step(&mut self) -> Result<StepResult, String> {
+        if self.is_finished() {
+            return Ok(StepResult::Finished);
+        }
+        match self.exercise_now {
+            Some(exercise_now) => {
+                if exercise_now.start_time.elapsed() > self.settings.limits.answer_time {
+                    self.answer(Err(AnswerError::TimedOut));
+                    return Ok(StepResult::TimedOut);
+                }
+            }
+            None => {
+                if self.have_next() {
+                    self.exercise_now = Some(self.next()?);
+                    self.last_answer = None;
+                    return Ok(StepResult::ExerciseCreated);
+                }
+            }
+        }
+        Ok(StepResult::Nothing)
+    }
+
     pub fn get_answers(&self) -> &Vec<Answer> {
         &self.answers
     }
@@ -110,7 +146,11 @@ impl Session {
     }
 
     pub fn is_finished(&self) -> bool {
-        self.exercises_left() == 0
+        self.interrupted || self.exercises_left() == 0
+    }
+
+    pub fn interrupt(&mut self) {
+        self.interrupted = true;
     }
 
     pub fn save(&self) -> Result<(), std::io::Error> {
@@ -289,11 +329,11 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::answer::AnswerError;
+    use crate::domain::expression::Exercise;
+    use crate::domain::operation::Operation;
     use serde_json::json;
     use std::collections::HashSet;
-    use crate::domain::expression::Exercise;
-    use crate::domain::answer::AnswerError;
-    use crate::domain::operation::Operation;
 
     fn settings(exercise_count: usize) -> Settings {
         Settings {
@@ -419,7 +459,8 @@ mod tests {
             correct_answers: 1,
             grade: Grade::Three,
             last_answer: None,
-            exercise_now: None
+            exercise_now: None,
+            interrupted: false,
         };
 
         let serialized = serde_json::to_string(&session).unwrap();

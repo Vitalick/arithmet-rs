@@ -9,6 +9,7 @@ use ratatui::{
     text::Line,
     widgets::{Block, Widget},
 };
+use std::cmp::{max, min};
 use std::{
     sync::{
         Arc,
@@ -16,20 +17,18 @@ use std::{
     },
     time::Duration,
 };
-use std::cmp::{max, min};
 use validations::Validate;
 
 use crate::domain::answer::{Answer, AnswerError};
 use crate::domain::expression::ExerciseWithStartTime;
-use crate::domain::session::Session;
+use crate::domain::session::{Session, StepResult};
 use crate::domain::{operation::Operation, settings::Settings};
-use crate::tui_widgets::main::{MainWidget};
+use crate::tui_widgets::main::MainWidget;
 use crate::tui_widgets::status::{Status, StatusWidget};
 
 const CONFIG_PATH: &str = "arithmet.toml";
 const MAIN_AREA_HEIGHT: u16 = 16;
 const STATUS_AREA_HEIGHT: u16 = 10;
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActiveField {
@@ -46,9 +45,6 @@ pub struct App {
     status: Status,
     settings: Settings,
     session: Option<Session>,
-    exercise_now: Option<ExerciseWithStartTime>,
-    answer: Option<Answer>,
-    correct_answers: usize,
     active_field: Option<ActiveField>,
     input_buffer: String,
     cursor_frame: usize,
@@ -61,10 +57,7 @@ impl Default for App {
             status: Status::Welcome,
             settings: Settings::load(CONFIG_PATH).unwrap_or_default(),
             session: None,
-            correct_answers: 0,
             active_field: None,
-            exercise_now: None,
-            answer: None,
             input_buffer: String::new(),
             cursor_frame: 0,
             exit: false,
@@ -106,7 +99,7 @@ impl App {
             self.status = Status::GameFinished;
             return;
         }
-        if self.exercise_now.is_none() {
+        if self.session.as_ref().unwrap().exercise_now.is_none() {
             self.status = Status::AwaitingGameContinue;
             return;
         }
@@ -115,30 +108,19 @@ impl App {
 
     fn game_step(&mut self) -> Result<(), String> {
         match self.session.as_mut() {
-            None => return Err("session is not set".to_string()),
+            None => Err("session is not set".to_string()),
             Some(session) => {
-                if session.is_finished() {
-                    return Ok(());
-                }
-                match self.exercise_now {
-                    Some(exercise_now) => {
-                        if exercise_now.start_time.elapsed() > session.settings.limits.answer_time {
-                            session.answer(Err(AnswerError::TimedOut));
-                            if matches!(self.active_field, Some(ActiveField::GameAnswer)) {
-                                self.cancel_input();
-                            }
-                            return Ok(());
+                match session.game_step()? {
+                    StepResult::TimedOut => {
+                        if matches!(self.active_field, Some(ActiveField::GameAnswer)) {
+                            self.cancel_input();
                         }
                     }
-                    None =>
-                        if session.have_next() {
-                            self.exercise_now = Some(session.next()?);
-                            self.answer = None;
-                        }
+                    _ => {}
                 }
+                Ok(())
             }
         }
-        Ok(())
     }
 
     fn answer_str(&mut self, entered: String) {
@@ -218,7 +200,7 @@ impl App {
             ActiveField::GameAnswer => {
                 self.answer_str(value.to_string());
                 self.cancel_input();
-                return ;
+                return;
             }
             ActiveField::Complexity => {
                 if let Ok(value) = value.parse::<u64>() {
@@ -260,26 +242,25 @@ impl App {
                 Status::AwaitingGameContinue => {
                     match key_event.code {
                         KeyCode::Enter | KeyCode::Tab => {
-                            self.exercise_now = None;
+                            if let Some(session) = self.session.as_mut() {
+                                session.prepare_next_exercise().unwrap();
+                            }
                             self.start_input(ActiveField::GameAnswer);
                             return true;
-
                         }
                         KeyCode::F(10) | KeyCode::Esc => {
-                            self.session = None;
-                            self.exercise_now = None;
-                            self.correct_answers = 0;
+                            self.session.as_mut().unwrap().interrupt();
                             self.status = Status::Welcome;
                         }
-                        _ => ()
+                        _ => (),
                     }
                     if key_event.code == KeyCode::Enter {
                         self.start_game().unwrap();
                         self.start_input(ActiveField::GameAnswer);
                         return true;
                     }
-                },
-                _ => ()
+                }
+                _ => (),
             }
             return false;
         }
@@ -295,8 +276,8 @@ impl App {
                 if self.active_field == Some(ActiveField::PlayerName)
                     || character.is_ascii_digit()
                     || (character == '-'
-                    && self.input_buffer.is_empty()
-                    && matches!(
+                        && self.input_buffer.is_empty()
+                        && matches!(
                             self.active_field,
                             Some(ActiveField::ResultMin | ActiveField::ResultMax)
                         ))
@@ -362,17 +343,23 @@ impl Widget for &App {
             Constraint::Length(MAIN_AREA_HEIGHT),
             Constraint::Min(STATUS_AREA_HEIGHT),
         ])
-            .areas(inner);
+        .areas(inner);
 
         MainWidget::new(
             &self.settings,
-            self.correct_answers,
+            self.session.as_ref().unwrap().correct_answers,
             self.active_field,
             &self.input_buffer,
-            &self.exercise_now,
+            &self.session.as_ref().unwrap().exercise_now,
         )
-            .render(main_area, buf);
-        StatusWidget::new(&self.session, &self.exercise_now, self.status, self.active_field).render(status_area, buf);
+        .render(main_area, buf);
+        StatusWidget::new(
+            &self.session,
+            &self.session.as_ref().unwrap().exercise_now,
+            self.status,
+            self.active_field,
+        )
+        .render(status_area, buf);
     }
 }
 
@@ -419,11 +406,8 @@ mod tests {
         App {
             status: Status::Welcome,
             settings,
-            answer: None,
-            correct_answers: 0,
             active_field: None,
             session: None,
-            exercise_now: None,
             input_buffer: String::new(),
             cursor_frame: 0,
             exit: false,
