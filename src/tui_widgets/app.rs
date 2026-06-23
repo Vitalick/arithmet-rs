@@ -347,7 +347,7 @@ impl Widget for &App {
 
         MainWidget::new(
             &self.settings,
-            self.session.as_ref().unwrap().correct_answers,
+            self.session.as_ref().unwrap_or_default().correct_answers,
             self.active_field,
             &self.input_buffer,
             &self.session.as_ref().unwrap().exercise_now,
