@@ -419,30 +419,37 @@ impl App {
         if self.is_game_active() {
             return match self.status {
                 Status::AwaitingGameContinue => Line::from(vec![
+                    " ".into(),
                     "<Enter/Tab>".yellow().bold(),
                     " - следующий пример, ".into(),
                     "<Esc/Ctrl+C>".yellow().bold(),
                     " - на главную".into(),
+                    " ".into(),
                 ]),
                 _ => Line::from(vec![
+                    " ".into(),
                     "<Enter>".yellow().bold(),
                     " - ответить, ".into(),
                     "<Backspace/Delete>".yellow().bold(),
                     " - правка, ".into(),
                     "<Esc/Ctrl+C>".yellow().bold(),
                     " - на главную".into(),
+                    " ".into(),
                 ]),
             };
         }
 
         match self.status {
             Status::GameFinished => Line::from(vec![
+                " ".into(),
                 "<Enter>".yellow().bold(),
                 " - новая игра, ".into(),
                 "<Esc/Ctrl+C/Q>".yellow().bold(),
                 " - выход".into(),
+                " ".into(),
             ]),
             _ => Line::from(vec![
+                " ".into(),
                 "<+ - * / :>".yellow().bold(),
                 " - действие, ".into(),
                 "<И О Д К С>".yellow().bold(),
@@ -451,6 +458,7 @@ impl App {
                 " - старт, ".into(),
                 "<Esc/Ctrl+C/Q>".yellow().bold(),
                 " - выход".into(),
+                " ".into(),
             ]),
         }
     }
