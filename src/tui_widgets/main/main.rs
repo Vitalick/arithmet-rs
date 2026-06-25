@@ -1,7 +1,9 @@
 use super::operation_item::OperationItemWidget;
 use super::{CursorType, cursor};
-use crate::domain::expression::ExerciseWithStartTime;
+use crate::domain::answer::{Answer, AnswerError};
+use crate::domain::expression::Exercise;
 use crate::domain::operation::Operation;
+use crate::domain::session::Session;
 use crate::domain::settings::Settings;
 use crate::tui_widgets::app::ActiveField;
 use crate::tui_widgets::main::field_line::FieldLineWidget;
@@ -17,26 +19,23 @@ pub const HEADER_NAME: &str = "VIT";
 #[derive(Debug)]
 pub struct MainWidget<'a> {
     settings: &'a Settings,
-    correct_answers: usize,
+    session: &'a Option<Session>,
     active_field: Option<ActiveField>,
     input_buffer: &'a str,
-    exercise_now: &'a Option<ExerciseWithStartTime>,
 }
 
 impl<'a> MainWidget<'a> {
     pub fn new(
         settings: &'a Settings,
-        correct_answers: usize,
+        session: &'a Option<Session>,
         active_field: Option<ActiveField>,
         input_buffer: &'a str,
-        exercise_now: &'a Option<ExerciseWithStartTime>,
     ) -> Self {
         Self {
             settings,
-            correct_answers,
+            session,
             active_field,
             input_buffer,
-            exercise_now,
         }
     }
 
@@ -92,22 +91,19 @@ impl<'a> MainWidget<'a> {
     fn render_exercise(&self, area: Rect, buf: &mut Buffer) {
         let exercise_block = Block::bordered()
             .border_set(border::PLAIN)
-            .title(Line::from("Пример".bold()).centered())
+            .title(Line::from(self.exercise_title()).bold().centered())
             .title_bottom(
-                Line::from(format!("Верных ответов: {}", self.correct_answers).bold()).centered(),
+                Line::from(format!(
+                    "Верных ответов: {}",
+                    self.session
+                        .as_ref()
+                        .map(|session| session.correct_answers)
+                        .unwrap_or_default()
+                ))
+                .bold()
+                .centered(),
             );
-        let exercise = match self.exercise_now {
-            Some(exercise_now) => Paragraph::new(
-                format!(
-                    "{} = {}{}",
-                    exercise_now.exercise,
-                    self.input_buffer,
-                    CursorType::Spinner
-                )
-                .to_string(),
-            ),
-            None => Paragraph::new(""),
-        };
+        let exercise = Paragraph::new(self.exercise_text());
         exercise.block(exercise_block).render(area, buf);
     }
 
@@ -115,8 +111,8 @@ impl<'a> MainWidget<'a> {
         let check_block = Block::bordered()
             .border_set(border::PLAIN)
             .title(Line::from("Проверка".bold()).centered())
-            .title_bottom(Line::from("Верный ответ:".bold()).centered());
-        let check_text = vec![Line::from("a)"), Line::from("b)"), Line::from("")];
+            .title_bottom(Line::from(self.correct_answer_text()).bold().centered());
+        let check_text = self.check_text();
         Paragraph::new(check_text)
             .block(check_block)
             .render(area, buf);
@@ -211,6 +207,85 @@ impl<'a> MainWidget<'a> {
             ActiveField::GameAnswer => String::new(),
         }
     }
+
+    fn exercise_title(&self) -> String {
+        let Some(session) = self.session.as_ref() else {
+            return "Пример".to_string();
+        };
+        let total = session.settings.limits.exercise_count;
+        let current = if session.exercise_now.is_some() {
+            session.total_answers() + 1
+        } else {
+            session.total_answers()
+        };
+        format!("Пример {}/{}", current.clamp(1, total), total)
+    }
+
+    fn exercise_text(&self) -> String {
+        let Some(session) = self.session.as_ref() else {
+            return String::new();
+        };
+        if let Some(exercise_now) = session.exercise_now {
+            return format!(
+                "{} = {}{}",
+                exercise_now.exercise,
+                self.input_buffer,
+                CursorType::Spinner
+            );
+        }
+        let Some(answer) = session.last_answer else {
+            return String::new();
+        };
+        format!("{} = {}", answer.exercise, answer_text(&answer))
+    }
+
+    fn check_text(&self) -> Vec<Line<'static>> {
+        let Some(answer) = self
+            .session
+            .as_ref()
+            .and_then(|session| session.last_answer)
+        else {
+            return vec![Line::from("a)"), Line::from("b)"), Line::from("")];
+        };
+        let Ok([first, second]) = answer.check_expressions() else {
+            return vec![Line::from("a)"), Line::from("b)"), Line::from("")];
+        };
+        vec![
+            Line::from(format!("a) {}", expression_text(&*first))),
+            Line::from(format!("b) {}", expression_text(&*second))),
+            Line::from(""),
+        ]
+    }
+
+    fn correct_answer_text(&self) -> String {
+        let Some(exercise) = self.visible_answer().map(|answer| answer.exercise) else {
+            return "Верный ответ:".to_string();
+        };
+        format!("Верный ответ: {}", expected_text(exercise))
+    }
+
+    fn visible_answer(&self) -> Option<Answer> {
+        self.session
+            .as_ref()
+            .and_then(|session| session.last_answer)
+    }
+}
+
+fn answer_text(answer: &Answer) -> String {
+    match answer.entered {
+        Ok(entered) => entered.to_string(),
+        Err(AnswerError::InvalidInput) => "некорректно".to_string(),
+        Err(AnswerError::TimedOut) => "время вышло".to_string(),
+        Err(AnswerError::Escaped | AnswerError::SessionAborted) => "прервано".to_string(),
+    }
+}
+
+fn expected_text(exercise: Exercise) -> String {
+    exercise.expected_str().unwrap_or_else(|_| "?".to_string())
+}
+
+fn expression_text(expression: &dyn crate::domain::expression::Expression) -> String {
+    expression.evaluate().unwrap_or_else(|_| "?".to_string())
 }
 
 impl Widget for MainWidget<'_> {

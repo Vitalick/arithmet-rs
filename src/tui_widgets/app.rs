@@ -369,10 +369,9 @@ impl Widget for &App {
 
         MainWidget::new(
             &self.settings,
-            session.correct_answers,
+            &self.session,
             self.active_field,
             &self.input_buffer,
-            &session.exercise_now,
         )
         .render(main_area, buf);
         StatusWidget::new(
@@ -421,6 +420,7 @@ fn is_ctrl_c(key_event: KeyEvent) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::expression::{Exercise, ExerciseWithStartTime};
     use crate::tui_widgets::main::HEADER_NAME;
     use std::collections::HashSet;
     use std::fs;
@@ -450,6 +450,15 @@ mod tests {
             std::process::id(),
             suffix
         ))
+    }
+
+    fn rendered_text(buffer: &Buffer) -> String {
+        buffer
+            .content()
+            .chunks(buffer.area.width as usize)
+            .map(|line| line.iter().map(|cell| cell.symbol()).collect::<String>())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     #[test]
@@ -579,6 +588,41 @@ mod tests {
     }
 
     #[test]
+    fn answered_exercise_stays_visible_with_check_and_counter() {
+        let settings = Settings {
+            operations: HashSet::from([Operation::Addition]),
+            limits: crate::domain::settings::Limits {
+                exercise_count: 2,
+                ..Default::default()
+            },
+            ..Settings::default()
+        };
+        let mut app = test_app(settings.clone());
+        let mut session = Session::new(settings).unwrap();
+        session.exercise_now = Some(ExerciseWithStartTime::new(Exercise::new(
+            2,
+            Operation::Addition,
+            3,
+        )));
+        app.session = Some(session);
+        app.start_input(ActiveField::GameAnswer);
+        app.input_buffer = "5".to_string();
+
+        app.handle_key_event(KeyCode::Enter.into());
+        app.update_status().unwrap();
+
+        let mut buffer = Buffer::empty(Rect::new(0, 0, 200, 60));
+        (&app).render(buffer.area, &mut buffer);
+        let rendered = rendered_text(&buffer);
+
+        assert!(rendered.contains("Пример 1/2"));
+        assert!(rendered.contains("2 + 3 = 5"));
+        assert!(rendered.contains("a) 5 - 2 = 3"));
+        assert!(rendered.contains("b) 5 - 3 = 2"));
+        assert!(rendered.contains("Верный ответ: 5"));
+    }
+
+    #[test]
     fn final_answer_saves_results_once_and_shows_finished_status() {
         let results_dir = unique_results_dir();
         let mut app = test_app(Settings {
@@ -643,10 +687,9 @@ mod tests {
         let mut buffer = Buffer::empty(Rect::new(0, 0, 200, 60));
 
         (&app).render(buffer.area, &mut buffer);
-        let rendered_lines = buffer
-            .content()
-            .chunks(buffer.area.width as usize)
-            .map(|line| line.iter().map(|cell| cell.symbol()).collect::<String>())
+        let rendered_lines = rendered_text(&buffer)
+            .lines()
+            .map(ToString::to_string)
             .collect::<Vec<_>>();
         let rendered = rendered_lines.join("\n");
         let header_line = rendered_lines

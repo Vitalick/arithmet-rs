@@ -36,13 +36,30 @@ impl Widget for BannerWidget<'_> {
         }
 
         let mut banner_paragraph = banner::render_to_paragraph(banner_text.as_str());
-        if self.status == Status::GameFinished {
-            banner_paragraph = banner_paragraph.style(grade_style(
-                self.session.as_ref().unwrap().get_grade().value(),
-            ));
+        if let Some(style) = self.banner_style() {
+            banner_paragraph = banner_paragraph.style(style);
         }
 
         banner_paragraph.centered().render(area, buf);
+    }
+}
+
+impl BannerWidget<'_> {
+    fn banner_style(&self) -> Option<Style> {
+        match self.status {
+            Status::AwaitingGameContinue => {
+                let answer = self.session.as_ref()?.last_answer?;
+                if answer.is_correct() {
+                    Some(Style::new().green())
+                } else {
+                    Some(Style::new().red())
+                }
+            }
+            Status::GameFinished => Some(grade_style(
+                self.session.as_ref().unwrap().get_grade().value(),
+            )),
+            _ => None,
+        }
     }
 }
 
@@ -53,5 +70,41 @@ fn grade_style(value: u8) -> Style {
         3 => Style::new().yellow(),
         2 => Style::new().light_red(),
         _ => Style::new().red(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::expression::{Exercise, ExerciseWithStartTime};
+    use crate::domain::operation::Operation;
+    use crate::domain::settings::Settings;
+    use ratatui::style::Color;
+
+    fn session_with_answer(entered: i64) -> Session {
+        let mut session = Session::new(Settings::default()).unwrap();
+        session.exercise_now = Some(ExerciseWithStartTime::new(Exercise::new(
+            2,
+            Operation::Addition,
+            3,
+        )));
+        session.answer(Ok(entered));
+        session
+    }
+
+    #[test]
+    fn last_answer_banner_is_green_for_correct_answer() {
+        let session = Some(session_with_answer(5));
+        let widget = BannerWidget::new(&session, Status::AwaitingGameContinue);
+
+        assert_eq!(widget.banner_style().unwrap().fg, Some(Color::Green));
+    }
+
+    #[test]
+    fn last_answer_banner_is_red_for_wrong_answer() {
+        let session = Some(session_with_answer(4));
+        let widget = BannerWidget::new(&session, Status::AwaitingGameContinue);
+
+        assert_eq!(widget.banner_style().unwrap().fg, Some(Color::Red));
     }
 }
