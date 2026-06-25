@@ -5,7 +5,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Modifier, Style};
 use ratatui::widgets::{Gauge, Widget};
-use std::cmp::{max, min};
+use std::cmp::min;
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -39,10 +39,11 @@ impl Widget for ProgressWidget<'_> {
             exercise_now.start_time.elapsed(),
             session.settings.limits.answer_time,
         );
-        let time_left = max(
-            session.settings.limits.answer_time - time_elapsed,
-            Duration::ZERO,
-        );
+        let time_left = session
+            .settings
+            .limits
+            .answer_time
+            .saturating_sub(time_elapsed);
         let ratio = time_elapsed.as_millis() as f64
             / session.settings.limits.answer_time.as_millis() as f64;
         let warning_secs = Duration::from_secs(5);
@@ -50,7 +51,7 @@ impl Widget for ProgressWidget<'_> {
         let label_string = format!(
             "Осталось {}.{:02} сек.",
             time_left.as_secs(),
-            time_left.as_millis() % Duration::from_secs(1).as_millis() / 10
+            time_left.subsec_millis() / 10
         );
         let gauge_style = if time_left <= danger_secs {
             Style::new().red()

@@ -66,7 +66,7 @@ impl Session {
         };
         let elapsed = exercise_now.start_time.elapsed();
 
-        let entered = if matches!(entered, Ok(_)) && elapsed > self.settings.limits.answer_time {
+        let entered = if matches!(entered, Ok(_)) && elapsed >= self.settings.limits.answer_time {
             Err(AnswerError::TimedOut)
         } else {
             entered
@@ -106,7 +106,7 @@ impl Session {
         }
         match self.exercise_now {
             Some(exercise_now) => {
-                if exercise_now.start_time.elapsed() > self.settings.limits.answer_time {
+                if exercise_now.start_time.elapsed() >= self.settings.limits.answer_time {
                     self.answer(Err(AnswerError::TimedOut));
                     return Ok(StepResult::TimedOut);
                 }
@@ -343,10 +343,11 @@ impl Session {
 mod tests {
     use super::*;
     use crate::domain::answer::AnswerError;
-    use crate::domain::expression::Exercise;
+    use crate::domain::expression::{Exercise, ExerciseWithStartTime};
     use crate::domain::operation::Operation;
     use serde_json::json;
     use std::collections::HashSet;
+    use std::time::Instant;
 
     fn settings(exercise_count: usize) -> Settings {
         Settings {
@@ -407,6 +408,22 @@ mod tests {
     #[test]
     fn test_session_settings_validation() {
         assert!(Session::new(settings(0)).is_err());
+    }
+
+    #[test]
+    fn test_game_step_times_out_at_answer_time_boundary() {
+        let mut session = Session::new(settings(1)).unwrap();
+        session.exercise_now = Some(ExerciseWithStartTime {
+            exercise: Exercise::new(2, Operation::Addition, 3),
+            start_time: Instant::now() - session.settings.limits.answer_time,
+        });
+
+        assert!(matches!(session.game_step().unwrap(), StepResult::TimedOut));
+        assert_eq!(session.total_answers(), 1);
+        assert!(matches!(
+            session.last_answer.unwrap().entered,
+            Err(AnswerError::TimedOut)
+        ));
     }
 
     #[test]
