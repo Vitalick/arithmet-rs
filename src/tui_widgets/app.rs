@@ -22,6 +22,7 @@ use crate::domain::answer::AnswerError;
 use crate::domain::session::{Session, StepResult};
 use crate::domain::{operation::Operation, settings::Settings};
 use crate::tui_widgets::main::MainWidget;
+use crate::tui_widgets::results::ResultsWidget;
 use crate::tui_widgets::status::{Status, StatusWidget};
 
 const CONFIG_PATH: &str = "arithmet.toml";
@@ -43,10 +44,13 @@ pub struct App {
     status: Status,
     settings: Settings,
     session: Option<Session>,
+    last_finished_session: Option<Session>,
     active_field: Option<ActiveField>,
     input_buffer: String,
     cursor_frame: usize,
     results_saved: bool,
+    results_scroll: usize,
+    results_return_status: Status,
     exit: bool,
 }
 
@@ -56,10 +60,13 @@ impl Default for App {
             status: Status::Welcome,
             settings: Settings::load(CONFIG_PATH).unwrap_or_default(),
             session: None,
+            last_finished_session: None,
             active_field: None,
             input_buffer: String::new(),
             cursor_frame: 0,
             results_saved: false,
+            results_scroll: 0,
+            results_return_status: Status::Welcome,
             exit: false,
         }
     }
@@ -91,6 +98,9 @@ impl App {
     }
 
     fn update_status(&mut self) -> Result<()> {
+        if self.status == Status::ResultsView {
+            return Ok(());
+        }
         if self.session.is_none() {
             self.status = Status::Welcome;
             return Ok(());
@@ -111,12 +121,12 @@ impl App {
             }
         }
         let session = self.session.as_ref().unwrap();
+        if session.exercise_now.is_none() && session.last_answer.is_some() && !self.results_saved {
+            self.status = Status::AwaitingGameContinue;
+            return Ok(());
+        }
         if session.is_finished() {
-            if !self.results_saved {
-                session.save().wrap_err("save session results failed")?;
-                self.results_saved = true;
-            }
-            self.status = Status::GameFinished;
+            self.finish_session()?;
             return Ok(());
         }
         if self.session.as_ref().unwrap().exercise_now.is_none() {
@@ -144,6 +154,21 @@ impl App {
         }
     }
 
+    fn finish_session(&mut self) -> Result<()> {
+        let Some(session) = self.session.as_ref() else {
+            return Ok(());
+        };
+        if !self.results_saved {
+            session.save().wrap_err("save session results failed")?;
+            self.last_finished_session = Some(session.clone());
+            self.results_saved = true;
+        }
+        self.status = Status::GameFinished;
+        self.active_field = None;
+        self.input_buffer.clear();
+        Ok(())
+    }
+
     fn answer_str(&mut self, entered: String) {
         if let Some(session) = self.session.as_mut() {
             match entered.parse() {
@@ -169,6 +194,42 @@ impl App {
         self.results_saved = false;
     }
 
+    fn open_results(&mut self) {
+        if self.is_game_active() || self.result_session().is_none() {
+            return;
+        }
+        self.results_return_status = self.status;
+        self.status = Status::ResultsView;
+        self.active_field = None;
+        self.input_buffer.clear();
+        self.clamp_results_scroll();
+    }
+
+    fn close_results(&mut self) {
+        self.status = self.results_return_status;
+        self.clamp_results_scroll();
+    }
+
+    fn result_session(&self) -> Option<&Session> {
+        self.session
+            .as_ref()
+            .filter(|_| self.status == Status::GameFinished)
+            .or(self.last_finished_session.as_ref())
+    }
+
+    fn result_answer_count(&self) -> usize {
+        self.result_session()
+            .map(Session::total_answers)
+            .unwrap_or_default()
+    }
+
+    fn clamp_results_scroll(&mut self) {
+        let max_scroll = self
+            .result_answer_count()
+            .saturating_sub(ResultsWidget::page_size());
+        self.results_scroll = self.results_scroll.min(max_scroll);
+    }
+
     fn is_game_active(&self) -> bool {
         matches!(
             self.status,
@@ -177,6 +238,11 @@ impl App {
     }
 
     fn handle_escape_key(&mut self) {
+        if self.status == Status::ResultsView {
+            self.close_results();
+            return;
+        }
+
         if self.active_field == Some(ActiveField::GameAnswer)
             || self.status == Status::AwaitingGameContinue
         {
@@ -284,6 +350,10 @@ impl App {
     fn handle_input_key_event(&mut self, key_event: KeyEvent) -> bool {
         if self.active_field.is_none() {
             match self.status {
+                Status::ResultsView => {
+                    self.handle_results_key_event(key_event);
+                    return true;
+                }
                 Status::Welcome | Status::GameFinished => {
                     if key_event.code == KeyCode::Enter {
                         self.start_game().unwrap();
@@ -293,8 +363,17 @@ impl App {
                 }
                 Status::AwaitingGameContinue => match key_event.code {
                     KeyCode::Enter | KeyCode::Tab => {
-                        self.game_step().unwrap();
-                        self.start_input(ActiveField::GameAnswer);
+                        let have_next = self
+                            .session
+                            .as_ref()
+                            .map(Session::have_next)
+                            .unwrap_or_default();
+                        if have_next {
+                            self.game_step().unwrap();
+                            self.start_input(ActiveField::GameAnswer);
+                        } else {
+                            self.finish_session().unwrap();
+                        }
                         return true;
                     }
                     KeyCode::Esc => {
@@ -350,7 +429,8 @@ impl App {
         match key_event.code {
             KeyCode::Esc => self.handle_escape_key(),
             KeyCode::Char('q') | KeyCode::Char('Q') => self.exit(),
-            KeyCode::F(1) => {}
+            KeyCode::F(1) => self.open_results(),
+            KeyCode::Char(character) if is_results_hotkey(character) => self.open_results(),
             KeyCode::Char('+') => self.toggle_operation(Operation::Addition),
             KeyCode::Char('-') => self.toggle_operation(Operation::Subtraction),
             KeyCode::Char('*') => self.toggle_operation(Operation::Multiplication),
@@ -360,6 +440,39 @@ impl App {
                 if let Some(field) = field_hotkey(character) {
                     self.start_input(field);
                 }
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_results_key_event(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Esc => self.handle_escape_key(),
+            KeyCode::Up => {
+                self.results_scroll = self.results_scroll.saturating_sub(1);
+            }
+            KeyCode::Down => {
+                self.results_scroll = self.results_scroll.saturating_add(1);
+                self.clamp_results_scroll();
+            }
+            KeyCode::PageUp => {
+                self.results_scroll = self
+                    .results_scroll
+                    .saturating_sub(ResultsWidget::page_size());
+            }
+            KeyCode::PageDown => {
+                self.results_scroll = self
+                    .results_scroll
+                    .saturating_add(ResultsWidget::page_size());
+                self.clamp_results_scroll();
+            }
+            KeyCode::Home => {
+                self.results_scroll = 0;
+            }
+            KeyCode::End => {
+                self.results_scroll = self
+                    .result_answer_count()
+                    .saturating_sub(ResultsWidget::page_size());
             }
             _ => {}
         }
@@ -387,6 +500,13 @@ impl Widget for &App {
 
         let inner = outer.inner(area);
         outer.render(area, buf);
+
+        if self.status == Status::ResultsView {
+            if let Some(session) = self.result_session() {
+                ResultsWidget::new(session, self.results_scroll).render(inner, buf);
+            }
+            return;
+        }
 
         let [main_area, status_area] = Layout::vertical([
             Constraint::Length(MAIN_AREA_HEIGHT),
@@ -442,10 +562,20 @@ impl App {
         match self.status {
             Status::GameFinished => Line::from(vec![
                 " ".into(),
+                "<F1/Р>".yellow().bold(),
+                " - результаты, ".into(),
                 "<Enter>".yellow().bold(),
                 " - новая игра, ".into(),
                 "<Esc/Ctrl+C/Q>".yellow().bold(),
                 " - выход".into(),
+                " ".into(),
+            ]),
+            Status::ResultsView => Line::from(vec![
+                " ".into(),
+                "<↑↓ PgUp PgDn Home End>".yellow().bold(),
+                " - прокрутка, ".into(),
+                "<Esc/Ctrl+C>".yellow().bold(),
+                " - назад".into(),
                 " ".into(),
             ]),
             _ => Line::from(vec![
@@ -454,6 +584,16 @@ impl App {
                 " - действие, ".into(),
                 "<И О Д К С>".yellow().bold(),
                 " - поля, ".into(),
+                if self.result_session().is_some() {
+                    "<F1/Р>".yellow().bold()
+                } else {
+                    "".into()
+                },
+                if self.result_session().is_some() {
+                    " - результаты, ".into()
+                } else {
+                    "".into()
+                },
                 "<Enter>".yellow().bold(),
                 " - старт, ".into(),
                 "<Esc/Ctrl+C/Q>".yellow().bold(),
@@ -462,6 +602,10 @@ impl App {
             ]),
         }
     }
+}
+
+fn is_results_hotkey(character: char) -> bool {
+    matches!(character, 'р' | 'Р' | 'h' | 'H')
 }
 
 fn field_hotkey(character: char) -> Option<ActiveField> {
@@ -495,9 +639,12 @@ mod tests {
             settings,
             active_field: None,
             session: None,
+            last_finished_session: None,
             input_buffer: String::new(),
             cursor_frame: 0,
             results_saved: false,
+            results_scroll: 0,
+            results_return_status: Status::Welcome,
             exit: false,
         }
     }
@@ -736,7 +883,7 @@ mod tests {
     }
 
     #[test]
-    fn final_answer_saves_results_once_and_shows_finished_status() {
+    fn final_answer_shows_banner_before_grade_then_saves_results_once() {
         let results_dir = unique_results_dir();
         let mut app = test_app(Settings {
             player_name: "ui_player".to_string(),
@@ -763,10 +910,15 @@ mod tests {
         app.input_buffer = expected.to_string();
         app.handle_key_event(KeyCode::Enter.into());
         app.update_status().unwrap();
-        app.update_status().unwrap();
 
+        assert_eq!(app.status, Status::AwaitingGameContinue);
+        assert!(!app.results_saved);
+        assert!(app.last_finished_session.is_none());
+
+        app.handle_key_event(KeyCode::Enter.into());
         assert_eq!(app.status, Status::GameFinished);
         assert!(app.results_saved);
+        assert!(app.last_finished_session.is_some());
 
         let player_dir = results_dir.join("ui_player");
         let result_files = fs::read_dir(&player_dir)
@@ -774,6 +926,91 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
         assert_eq!(result_files.len(), 2);
+
+        let _ = fs::remove_dir_all(results_dir);
+    }
+
+    #[test]
+    fn f1_and_russian_r_open_results_after_finished_game() {
+        let results_dir = unique_results_dir();
+        let mut app = test_app(Settings {
+            player_name: "results_player".to_string(),
+            results_dir: results_dir.to_string_lossy().into_owned(),
+            operations: HashSet::from([Operation::Addition]),
+            limits: crate::domain::settings::Limits {
+                exercise_count: 1,
+                ..Default::default()
+            },
+            ..Settings::default()
+        });
+        app.start_game().unwrap();
+        app.start_input(ActiveField::GameAnswer);
+        let expected = app
+            .session
+            .as_ref()
+            .unwrap()
+            .exercise_now
+            .unwrap()
+            .exercise
+            .expected()
+            .unwrap();
+
+        app.input_buffer = expected.to_string();
+        app.handle_key_event(KeyCode::Enter.into());
+        app.update_status().unwrap();
+        app.handle_key_event(KeyCode::Enter.into());
+
+        app.handle_key_event(KeyCode::F(1).into());
+        assert_eq!(app.status, Status::ResultsView);
+
+        app.handle_key_event(KeyCode::Esc.into());
+        assert_eq!(app.status, Status::GameFinished);
+
+        app.handle_key_event(KeyCode::Char('Р').into());
+        assert_eq!(app.status, Status::ResultsView);
+
+        let _ = fs::remove_dir_all(results_dir);
+    }
+
+    #[test]
+    fn results_view_renders_summary_and_answer_table() {
+        let results_dir = unique_results_dir();
+        let mut app = test_app(Settings {
+            player_name: "results_player".to_string(),
+            results_dir: results_dir.to_string_lossy().into_owned(),
+            operations: HashSet::from([Operation::Addition]),
+            limits: crate::domain::settings::Limits {
+                exercise_count: 1,
+                ..Default::default()
+            },
+        });
+        app.start_game().unwrap();
+        app.start_input(ActiveField::GameAnswer);
+        let expected = app
+            .session
+            .as_ref()
+            .unwrap()
+            .exercise_now
+            .unwrap()
+            .exercise
+            .expected()
+            .unwrap();
+
+        app.input_buffer = expected.to_string();
+        app.handle_key_event(KeyCode::Enter.into());
+        app.update_status().unwrap();
+        app.handle_key_event(KeyCode::Enter.into());
+        app.handle_key_event(KeyCode::F(1).into());
+
+        let mut buffer = Buffer::empty(Rect::new(0, 0, 200, 60));
+        (&app).render(buffer.area, &mut buffer);
+        let rendered = rendered_text(&buffer);
+
+        assert!(rendered.contains("Р Е З У Л Ь Т А Т Ы"));
+        assert!(rendered.contains("results_player"));
+        assert!(rendered.contains("Количество действий"));
+        assert!(rendered.contains("Предложенные действия"));
+        assert!(rendered.contains("верно"));
 
         let _ = fs::remove_dir_all(results_dir);
     }

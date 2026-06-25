@@ -29,6 +29,7 @@ impl Widget for BannerWidget<'_> {
                     self.session.as_ref().unwrap().get_grade().value()
                 )
             }
+            Status::ResultsView => String::default(),
             _ => String::default(),
         };
         if banner_text.is_empty() {
@@ -58,6 +59,7 @@ impl BannerWidget<'_> {
             Status::GameFinished => Some(grade_style(
                 self.session.as_ref().unwrap().get_grade().value(),
             )),
+            Status::ResultsView => None,
             _ => None,
         }
     }

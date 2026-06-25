@@ -16,6 +16,7 @@ pub enum Status {
     AwaitingAnswer,
     AwaitingGameContinue,
     GameFinished,
+    ResultsView,
 }
 
 #[derive(Debug)]
@@ -76,6 +77,7 @@ impl StatusWidget<'_> {
                     Line::from("Результат сохранён").centered(),
                 ]
             }
+            Status::ResultsView => vec![Line::from("Результаты").centered()],
         }
     }
 }
