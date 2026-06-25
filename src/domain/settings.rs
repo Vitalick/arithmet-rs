@@ -60,11 +60,16 @@ impl Validate<String> for Limits {
     }
 }
 
-fn serialize_operations<S>(operations: &HashSet<Operation>, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_operations<S>(
+    operations: &HashSet<Operation>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
-    let operations = Operation::iter().filter(|op| operations.contains(op)).collect::<Vec<_>>();
+    let operations = Operation::iter()
+        .filter(|op| operations.contains(op))
+        .collect::<Vec<_>>();
     serializer.collect_seq(operations)
 }
 
@@ -79,7 +84,9 @@ pub struct Settings {
 
 impl Settings {
     pub fn enabled_operations(&self) -> Vec<Operation> {
-        Operation::iter().filter(|op| self.operations.contains(op)).collect::<Vec<_>>()
+        Operation::iter()
+            .filter(|op| self.operations.contains(op))
+            .collect::<Vec<_>>()
     }
     pub fn from_toml_str(input: &str) -> Result<Self, toml::de::Error> {
         toml::from_str(input)

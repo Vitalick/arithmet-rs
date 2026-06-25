@@ -68,7 +68,7 @@ impl Grade {
         crate::domain::banner::render(&self.banner_text())
     }
 
-    fn value(&self) -> u8 {
+    pub fn value(&self) -> u8 {
         match self {
             Grade::Five => 5,
             Grade::Four => 4,

@@ -1,7 +1,7 @@
+use super::Glyph;
 use super::cyrillic::{
     CYR_A, CYR_E, CYR_H, CYR_K, CYR_M, CYR_N, CYR_O, CYR_R, CYR_S, CYR_T, CYR_V,
 };
-use super::Glyph;
 
 pub(super) const LATIN_A: Glyph = CYR_A;
 pub(super) const LATIN_B: Glyph = CYR_V;

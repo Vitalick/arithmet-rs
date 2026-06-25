@@ -1,5 +1,5 @@
-use std::fmt::{Display, Formatter};
 use super::expression::Expression;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Comparison {
@@ -36,7 +36,6 @@ impl Expression for Comparison {
 #[cfg(test)]
 mod tests {
     use super::*;
-
 
     #[test]
     fn test_compare_expression() {

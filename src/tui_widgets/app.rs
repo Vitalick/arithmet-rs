@@ -9,7 +9,6 @@ use ratatui::{
     text::Line,
     widgets::{Block, Widget},
 };
-use std::cmp::{max, min};
 use std::{
     sync::{
         Arc,
@@ -19,8 +18,7 @@ use std::{
 };
 use validations::Validate;
 
-use crate::domain::answer::{Answer, AnswerError};
-use crate::domain::expression::ExerciseWithStartTime;
+use crate::domain::answer::AnswerError;
 use crate::domain::session::{Session, StepResult};
 use crate::domain::{operation::Operation, settings::Settings};
 use crate::tui_widgets::main::MainWidget;
@@ -48,6 +46,7 @@ pub struct App {
     active_field: Option<ActiveField>,
     input_buffer: String,
     cursor_frame: usize,
+    results_saved: bool,
     exit: bool,
 }
 
@@ -60,6 +59,7 @@ impl Default for App {
             active_field: None,
             input_buffer: String::new(),
             cursor_frame: 0,
+            results_saved: false,
             exit: false,
         }
     }
@@ -72,7 +72,7 @@ impl App {
         shutdown_requested: Arc<AtomicBool>,
     ) -> Result<()> {
         while !self.exit && !shutdown_requested.load(Ordering::Relaxed) {
-            self.update_status();
+            self.update_status()?;
             terminal.draw(|frame| self.render_frame(frame))?;
             self.handle_events().wrap_err("handle events failed")?;
         }
@@ -85,25 +85,46 @@ impl App {
 
     fn start_game(&mut self) -> Result<(), String> {
         self.session = Some(Session::new(self.settings.clone())?);
+        self.results_saved = false;
         self.game_step()?;
         Ok(())
     }
 
-    fn update_status(&mut self) {
+    fn update_status(&mut self) -> Result<()> {
         if self.session.is_none() {
             self.status = Status::Welcome;
-            return;
+            return Ok(());
+        }
+        if let Some(session) = self.session.as_mut()
+            && session.exercise_now.is_some()
+        {
+            match session
+                .game_step()
+                .map_err(|err| color_eyre::eyre::eyre!(err))?
+            {
+                StepResult::TimedOut => {
+                    if matches!(self.active_field, Some(ActiveField::GameAnswer)) {
+                        self.cancel_input();
+                    }
+                }
+                _ => {}
+            }
         }
         let session = self.session.as_ref().unwrap();
         if session.is_finished() {
+            if !self.results_saved {
+                session.save().wrap_err("save session results failed")?;
+                self.results_saved = true;
+            }
             self.status = Status::GameFinished;
-            return;
+            return Ok(());
         }
         if self.session.as_ref().unwrap().exercise_now.is_none() {
             self.status = Status::AwaitingGameContinue;
-            return;
+            return Ok(());
         }
         self.status = Status::AwaitingAnswer;
+        Ok(())
     }
 
     fn game_step(&mut self) -> Result<(), String> {
@@ -242,9 +263,7 @@ impl App {
                 Status::AwaitingGameContinue => {
                     match key_event.code {
                         KeyCode::Enter | KeyCode::Tab => {
-                            if let Some(session) = self.session.as_mut() {
-                                session.prepare_next_exercise().unwrap();
-                            }
+                            self.game_step().unwrap();
                             self.start_input(ActiveField::GameAnswer);
                             return true;
                         }
@@ -404,6 +423,8 @@ mod tests {
     use super::*;
     use crate::tui_widgets::main::HEADER_NAME;
     use std::collections::HashSet;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn test_app(settings: Settings) -> App {
         App {
@@ -413,8 +434,22 @@ mod tests {
             session: None,
             input_buffer: String::new(),
             cursor_frame: 0,
+            results_saved: false,
             exit: false,
         }
+    }
+
+    fn unique_results_dir() -> std::path::PathBuf {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+
+        std::env::temp_dir().join(format!(
+            "arithmet-app-flow-{}-{}",
+            std::process::id(),
+            suffix
+        ))
     }
 
     #[test]
@@ -501,6 +536,89 @@ mod tests {
         assert_eq!(app.settings.player_name, "old-name");
         assert_eq!(app.active_field, None);
         assert!(app.input_buffer.is_empty());
+    }
+
+    #[test]
+    fn game_answer_shows_banner_then_starts_next_exercise() {
+        let mut app = test_app(Settings {
+            operations: HashSet::from([Operation::Addition]),
+            limits: crate::domain::settings::Limits {
+                exercise_count: 2,
+                ..Default::default()
+            },
+            ..Settings::default()
+        });
+
+        app.start_game().unwrap();
+        app.start_input(ActiveField::GameAnswer);
+        let expected = app
+            .session
+            .as_ref()
+            .unwrap()
+            .exercise_now
+            .unwrap()
+            .exercise
+            .expected()
+            .unwrap();
+
+        app.input_buffer = expected.to_string();
+        app.handle_key_event(KeyCode::Enter.into());
+        app.update_status().unwrap();
+
+        let session = app.session.as_ref().unwrap();
+        assert_eq!(session.total_answers(), 1);
+        assert!(session.exercise_now.is_none());
+        assert_eq!(session.last_answer_banner(), "Молодец!");
+        assert_eq!(app.status, Status::AwaitingGameContinue);
+
+        app.handle_key_event(KeyCode::Enter.into());
+
+        let session = app.session.as_ref().unwrap();
+        assert!(session.exercise_now.is_some());
+        assert_eq!(app.active_field, Some(ActiveField::GameAnswer));
+    }
+
+    #[test]
+    fn final_answer_saves_results_once_and_shows_finished_status() {
+        let results_dir = unique_results_dir();
+        let mut app = test_app(Settings {
+            player_name: "ui_player".to_string(),
+            results_dir: results_dir.to_string_lossy().into_owned(),
+            operations: HashSet::from([Operation::Addition]),
+            limits: crate::domain::settings::Limits {
+                exercise_count: 1,
+                ..Default::default()
+            },
+        });
+
+        app.start_game().unwrap();
+        app.start_input(ActiveField::GameAnswer);
+        let expected = app
+            .session
+            .as_ref()
+            .unwrap()
+            .exercise_now
+            .unwrap()
+            .exercise
+            .expected()
+            .unwrap();
+
+        app.input_buffer = expected.to_string();
+        app.handle_key_event(KeyCode::Enter.into());
+        app.update_status().unwrap();
+        app.update_status().unwrap();
+
+        assert_eq!(app.status, Status::GameFinished);
+        assert!(app.results_saved);
+
+        let player_dir = results_dir.join("ui_player");
+        let result_files = fs::read_dir(&player_dir)
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert_eq!(result_files.len(), 2);
+
+        let _ = fs::remove_dir_all(results_dir);
     }
 
     #[test]

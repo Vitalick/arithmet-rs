@@ -1,16 +1,16 @@
+use super::operation_item::OperationItemWidget;
+use super::{CursorType, cursor};
+use crate::domain::expression::ExerciseWithStartTime;
 use crate::domain::operation::Operation;
 use crate::domain::settings::Settings;
 use crate::tui_widgets::app::ActiveField;
-use super::operation_item::OperationItemWidget;
+use crate::tui_widgets::main::field_line::FieldLineWidget;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::prelude::{Line, Span, Stylize};
 use ratatui::symbols::border;
 use ratatui::widgets::{Block, Paragraph, Widget};
 use strum::IntoEnumIterator;
-use crate::domain::expression::ExerciseWithStartTime;
-use crate::tui_widgets::main::field_line::FieldLineWidget;
-use super::{cursor, CursorType};
 
 pub const HEADER_NAME: &str = "VIT";
 
@@ -97,7 +97,15 @@ impl<'a> MainWidget<'a> {
                 Line::from(format!("Верных ответов: {}", self.correct_answers).bold()).centered(),
             );
         let exercise = match self.exercise_now {
-            Some(exercise_now) => Paragraph::new(format!("{} = {}{}", exercise_now.exercise, self.input_buffer, CursorType::Spinner).to_string()),
+            Some(exercise_now) => Paragraph::new(
+                format!(
+                    "{} = {}{}",
+                    exercise_now.exercise,
+                    self.input_buffer,
+                    CursorType::Spinner
+                )
+                .to_string(),
+            ),
             None => Paragraph::new(""),
         };
         exercise.block(exercise_block).render(area, buf);

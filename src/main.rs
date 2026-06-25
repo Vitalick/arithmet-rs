@@ -1,14 +1,14 @@
-use std::sync::{
-    Arc,
-    atomic::AtomicBool,
-};
+use std::sync::{Arc, atomic::AtomicBool};
 
-use color_eyre::{Result, eyre::WrapErr};
 use arithmet::tui_widgets::app::App;
+use color_eyre::{Result, eyre::WrapErr};
 
 #[cfg(unix)]
 fn install_signal_handler(shutdown_requested: Arc<AtomicBool>) -> Result<()> {
-    use signal_hook::{consts::signal::{SIGINT, SIGTERM}, flag};
+    use signal_hook::{
+        consts::signal::{SIGINT, SIGTERM},
+        flag,
+    };
 
     flag::register(SIGINT, Arc::clone(&shutdown_requested))
         .wrap_err("install SIGINT handler failed")?;

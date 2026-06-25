@@ -1,6 +1,6 @@
-use std::fmt::{Display, Formatter};
 use super::expression::Expression;
 use crate::domain::operation::Operation;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FakeExercise {
@@ -46,7 +46,6 @@ impl FakeExercise {
         FakeExercise { answer, ..self }
     }
 }
-
 
 impl Display for FakeExercise {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -98,5 +97,4 @@ mod tests {
         let division = FakeExercise::new_with_remainer(10, Operation::Division, 3, 3, 1);
         assert_eq!(division.evaluate().unwrap(), "10 / 3 = 3 (остаток 1)");
     }
-
 }

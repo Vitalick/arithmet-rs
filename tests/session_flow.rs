@@ -2,9 +2,9 @@ use std::collections::HashSet;
 use std::fs;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use arithmet::domain::answer::Answer;
 use arithmet::domain::operation::Operation;
 use arithmet::domain::session::Session;
-use arithmet::domain::answer::Answer;
 use arithmet::domain::settings::{Limits, Settings};
 use serde_json::Value;
 
@@ -49,12 +49,13 @@ fn session_generates_answers_and_writes_result() {
     while session.have_next() {
         let exercise = session.next().unwrap();
         let expected = exercise.exercise.expected().unwrap();
-        session.add_answer(Answer {
-            exercise: exercise.exercise,
-            entered: Ok(expected),
-            time_elapsed: Duration::from_secs(1),
-        })
-        .unwrap();
+        session
+            .add_answer(Answer {
+                exercise: exercise.exercise,
+                entered: Ok(expected),
+                time_elapsed: Duration::from_secs(1),
+            })
+            .unwrap();
     }
 
     assert!(session.is_finished());

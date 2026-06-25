@@ -7,7 +7,6 @@ pub trait Cursor {
     fn cursor(&self) -> String;
 }
 
-
 #[derive(Debug, Clone, Copy)]
 pub enum CursorType {
     BlinkingBlock,

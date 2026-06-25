@@ -10,7 +10,7 @@ pub trait Expression: Display {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::domain::expression::fake_exercise::FakeExercise;
     use crate::domain::operation::Operation;
-    use super::*;
 }

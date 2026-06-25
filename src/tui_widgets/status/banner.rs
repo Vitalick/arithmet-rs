@@ -18,7 +18,6 @@ impl<'a> BannerWidget<'a> {
     }
 }
 
-
 impl Widget for BannerWidget<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let banner_text = match self.status {
@@ -26,8 +25,8 @@ impl Widget for BannerWidget<'_> {
             Status::AwaitingGameContinue => self.session.as_ref().unwrap().last_answer_banner(),
             Status::GameFinished => {
                 format!(
-                    "Ваша оценка: {}",
-                    self.session.as_ref().unwrap().get_grade()
+                    "Ваша оценка {}",
+                    self.session.as_ref().unwrap().get_grade().value()
                 )
             }
             _ => String::default(),
@@ -36,8 +35,23 @@ impl Widget for BannerWidget<'_> {
             return;
         }
 
-        let banner_paragraph = banner::render_to_paragraph(banner_text.as_str());
+        let mut banner_paragraph = banner::render_to_paragraph(banner_text.as_str());
+        if self.status == Status::GameFinished {
+            banner_paragraph = banner_paragraph.style(grade_style(
+                self.session.as_ref().unwrap().get_grade().value(),
+            ));
+        }
 
         banner_paragraph.centered().render(area, buf);
+    }
+}
+
+fn grade_style(value: u8) -> Style {
+    match value {
+        5 => Style::new().green(),
+        4 => Style::new().light_green(),
+        3 => Style::new().yellow(),
+        2 => Style::new().light_red(),
+        _ => Style::new().red(),
     }
 }

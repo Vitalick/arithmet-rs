@@ -25,6 +25,7 @@ pub struct Session {
     pub exercise_now: Option<ExerciseWithStartTime>,
     #[serde(skip)]
     pub last_answer: Option<Answer>,
+    #[serde(default)]
     interrupted: bool,
 }
 
@@ -60,7 +61,9 @@ impl Session {
     }
 
     pub fn answer(&mut self, entered: Result<i64, AnswerError>) {
-        let exercise_now = self.exercise_now.unwrap();
+        let Some(exercise_now) = self.exercise_now.take() else {
+            return;
+        };
         let elapsed = exercise_now.start_time.elapsed();
 
         let entered = if matches!(entered, Ok(_)) && elapsed > self.settings.limits.answer_time {
@@ -77,7 +80,7 @@ impl Session {
         self.last_answer = Some(answer);
     }
 
-    fn add_answer(&mut self, answer: Answer) -> Result<(), String> {
+    pub fn add_answer(&mut self, answer: Answer) -> Result<(), String> {
         if !self.have_next() {
             return Err("Достигнут максимум количества ответов".to_string());
         }
@@ -128,6 +131,16 @@ impl Session {
 
     pub fn total_answers(&self) -> usize {
         self.answers.len()
+    }
+
+    pub fn result_summary(&self) -> String {
+        format!(
+            "Верных ответов: {} из {}. Оценка: {} ({})",
+            self.correct_answers,
+            self.total_answers(),
+            self.grade.value(),
+            self.grade
+        )
     }
 
     pub fn last_answer_banner(&self) -> String {
