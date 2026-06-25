@@ -161,6 +161,37 @@ impl App {
         self.exit = true;
     }
 
+    fn return_to_welcome(&mut self) {
+        self.session = None;
+        self.status = Status::Welcome;
+        self.active_field = None;
+        self.input_buffer.clear();
+        self.results_saved = false;
+    }
+
+    fn is_game_active(&self) -> bool {
+        matches!(
+            self.status,
+            Status::AwaitingAnswer | Status::AwaitingGameContinue
+        ) || matches!(self.active_field, Some(ActiveField::GameAnswer))
+    }
+
+    fn handle_escape_key(&mut self) {
+        if self.active_field == Some(ActiveField::GameAnswer)
+            || self.status == Status::AwaitingGameContinue
+        {
+            self.return_to_welcome();
+            return;
+        }
+
+        if self.active_field.is_some() {
+            self.cancel_input();
+            return;
+        }
+
+        self.exit();
+    }
+
     fn toggle_operation(&mut self, operation: Operation) {
         if self.settings.operations.contains(&operation) {
             if self.settings.operations.len() > 1 {
@@ -260,25 +291,18 @@ impl App {
                         return true;
                     }
                 }
-                Status::AwaitingGameContinue => {
-                    match key_event.code {
-                        KeyCode::Enter | KeyCode::Tab => {
-                            self.game_step().unwrap();
-                            self.start_input(ActiveField::GameAnswer);
-                            return true;
-                        }
-                        KeyCode::F(10) | KeyCode::Esc => {
-                            self.session.as_mut().unwrap().interrupt();
-                            self.status = Status::Welcome;
-                        }
-                        _ => (),
-                    }
-                    if key_event.code == KeyCode::Enter {
-                        self.start_game().unwrap();
+                Status::AwaitingGameContinue => match key_event.code {
+                    KeyCode::Enter | KeyCode::Tab => {
+                        self.game_step().unwrap();
                         self.start_input(ActiveField::GameAnswer);
                         return true;
                     }
-                }
+                    KeyCode::Esc => {
+                        self.handle_escape_key();
+                        return true;
+                    }
+                    _ => (),
+                },
                 _ => (),
             }
             return false;
@@ -286,7 +310,7 @@ impl App {
 
         match key_event.code {
             KeyCode::Enter => self.commit_input(),
-            KeyCode::Esc => self.cancel_input(),
+            KeyCode::Esc => self.handle_escape_key(),
             KeyCode::Backspace => {
                 self.input_buffer.pop();
             }
@@ -311,7 +335,7 @@ impl App {
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         if is_ctrl_c(key_event) {
-            self.exit();
+            self.handle_escape_key();
             return;
         }
 
@@ -319,8 +343,14 @@ impl App {
             return;
         }
 
+        if self.is_game_active() {
+            return;
+        }
+
         match key_event.code {
-            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => self.exit(),
+            KeyCode::Esc => self.handle_escape_key(),
+            KeyCode::Char('q') | KeyCode::Char('Q') => self.exit(),
+            KeyCode::F(1) => {}
             KeyCode::Char('+') => self.toggle_operation(Operation::Addition),
             KeyCode::Char('-') => self.toggle_operation(Operation::Subtraction),
             KeyCode::Char('*') => self.toggle_operation(Operation::Multiplication),
@@ -386,18 +416,43 @@ impl Widget for &App {
 
 impl App {
     fn instructions(&self) -> Line<'static> {
-        Line::from(vec![
-            "<+ - * / :>".yellow().bold(),
-            " - действие, ".into(),
-            "<И О Д К С>".yellow().bold(),
-            " - поля, ".into(),
-            "<F1>".yellow().bold(),
-            " - результат, ".into(),
-            "<Esc>".yellow().bold(),
-            " - выход, ".into(),
-            "<Enter>".yellow().bold(),
-            " - старт".into(),
-        ])
+        if self.is_game_active() {
+            return match self.status {
+                Status::AwaitingGameContinue => Line::from(vec![
+                    "<Enter/Tab>".yellow().bold(),
+                    " - следующий пример, ".into(),
+                    "<Esc/Ctrl+C>".yellow().bold(),
+                    " - на главную".into(),
+                ]),
+                _ => Line::from(vec![
+                    "<Enter>".yellow().bold(),
+                    " - ответить, ".into(),
+                    "<Backspace/Delete>".yellow().bold(),
+                    " - правка, ".into(),
+                    "<Esc/Ctrl+C>".yellow().bold(),
+                    " - на главную".into(),
+                ]),
+            };
+        }
+
+        match self.status {
+            Status::GameFinished => Line::from(vec![
+                "<Enter>".yellow().bold(),
+                " - новая игра, ".into(),
+                "<Esc/Ctrl+C/Q>".yellow().bold(),
+                " - выход".into(),
+            ]),
+            _ => Line::from(vec![
+                "<+ - * / :>".yellow().bold(),
+                " - действие, ".into(),
+                "<И О Д К С>".yellow().bold(),
+                " - поля, ".into(),
+                "<Enter>".yellow().bold(),
+                " - старт, ".into(),
+                "<Esc/Ctrl+C/Q>".yellow().bold(),
+                " - выход".into(),
+            ]),
+        }
     }
 }
 
@@ -506,15 +561,65 @@ mod tests {
     }
 
     #[test]
-    fn ctrl_c_exits_even_while_editing_text_input() {
+    fn escape_exits_from_welcome_screen() {
+        let mut app = test_app(Settings::default());
+
+        app.handle_key_event(KeyCode::Esc.into());
+
+        assert!(app.exit);
+    }
+
+    #[test]
+    fn ctrl_c_matches_escape_while_editing_text_input() {
         let mut app = test_app(Settings::default());
         app.start_input(ActiveField::PlayerName);
-        let input_buffer = app.input_buffer.clone();
+        app.input_buffer = "changed".to_string();
 
         app.handle_key_event(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
 
-        assert!(app.exit);
-        assert_eq!(app.input_buffer, input_buffer);
+        assert!(!app.exit);
+        assert_eq!(app.active_field, None);
+        assert!(app.input_buffer.is_empty());
+    }
+
+    #[test]
+    fn escape_and_ctrl_c_return_to_welcome_during_game() {
+        let mut escape_app = test_app(Settings::default());
+        escape_app.start_game().unwrap();
+        escape_app.start_input(ActiveField::GameAnswer);
+
+        escape_app.handle_key_event(KeyCode::Esc.into());
+
+        assert!(!escape_app.exit);
+        assert_eq!(escape_app.status, Status::Welcome);
+        assert!(escape_app.session.is_none());
+        assert_eq!(escape_app.active_field, None);
+
+        let mut ctrl_c_app = test_app(Settings::default());
+        ctrl_c_app.start_game().unwrap();
+        ctrl_c_app.start_input(ActiveField::GameAnswer);
+
+        ctrl_c_app.handle_key_event(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
+
+        assert!(!ctrl_c_app.exit);
+        assert_eq!(ctrl_c_app.status, Status::Welcome);
+        assert!(ctrl_c_app.session.is_none());
+        assert_eq!(ctrl_c_app.active_field, None);
+    }
+
+    #[test]
+    fn f1_does_not_change_active_game() {
+        let mut app = test_app(Settings::default());
+        app.start_game().unwrap();
+        app.start_input(ActiveField::GameAnswer);
+        app.input_buffer = "12".to_string();
+
+        app.handle_key_event(KeyCode::F(1).into());
+
+        assert!(!app.exit);
+        assert!(app.session.is_some());
+        assert_eq!(app.active_field, Some(ActiveField::GameAnswer));
+        assert_eq!(app.input_buffer, "12");
     }
 
     #[test]

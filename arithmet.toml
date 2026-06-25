@@ -2,11 +2,14 @@ player_name = "неизвестно"
 results_dir = "results"
 operations = [
     "+",
+    "-",
+    "*",
+    "/",
     ":",
 ]
 
 [limits]
 result_min = 100
 result_max = 150
-exercise_count = 20
-answer_time = "7s"
+exercise_count = 5
+answer_time = "10s"
