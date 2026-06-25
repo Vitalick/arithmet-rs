@@ -495,7 +495,14 @@ impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let outer = Block::bordered()
             .border_set(border::THICK)
-            .title(Line::from("У С Т Н Ы Й   С Ч Е Т".blue().bold()).centered())
+            .title(
+                Line::from(vec![
+                    " ".into(),
+                    "У С Т Н Ы Й   С Ч Е Т".blue().bold(),
+                    " ".into(),
+                ])
+                .centered(),
+            )
             .title_bottom(self.instructions().centered());
 
         let inner = outer.inner(area);

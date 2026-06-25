@@ -49,7 +49,7 @@ impl<'a> MainWidget<'a> {
     fn render_actions(&self, area: Rect, buf: &mut Buffer) {
         let block = Block::bordered()
             .border_set(border::PLAIN)
-            .title(Line::from("Действие".bold()).centered());
+            .title(Line::from(" Действие ".bold()).centered());
 
         let operations = Operation::iter()
             .map(|operation| {
@@ -94,7 +94,7 @@ impl<'a> MainWidget<'a> {
             .title(Line::from(self.exercise_title()).bold().centered())
             .title_bottom(
                 Line::from(format!(
-                    "Верных ответов: {}",
+                    " Верных ответов: {} ",
                     self.session
                         .as_ref()
                         .map(|session| session.correct_answers)
@@ -110,7 +110,7 @@ impl<'a> MainWidget<'a> {
     fn render_check(&self, area: Rect, buf: &mut Buffer) {
         let check_block = Block::bordered()
             .border_set(border::PLAIN)
-            .title(Line::from("Проверка".bold()).centered())
+            .title(Line::from(" Проверка ".bold()).centered())
             .title_bottom(Line::from(self.correct_answer_text()).bold().centered());
         let check_text = self.check_text();
         Paragraph::new(check_text)
@@ -128,7 +128,7 @@ impl<'a> MainWidget<'a> {
     fn render_settings(&self, area: Rect, buf: &mut Buffer) {
         let block = Block::bordered()
             .border_set(border::PLAIN)
-            .title(Line::from("Настройки".bold()).centered());
+            .title(Line::from(" Настройки ".bold()).centered());
 
         Paragraph::new(vec![
             self.field_line(
@@ -210,7 +210,7 @@ impl<'a> MainWidget<'a> {
 
     fn exercise_title(&self) -> String {
         let Some(session) = self.session.as_ref() else {
-            return "Пример".to_string();
+            return " Пример ".to_string();
         };
         let total = session.settings.limits.exercise_count;
         let current = if session.exercise_now.is_some() {
@@ -218,7 +218,7 @@ impl<'a> MainWidget<'a> {
         } else {
             session.total_answers()
         };
-        format!("Пример {}/{}", current.clamp(1, total), total)
+        format!(" Пример {}/{} ", current.clamp(1, total), total)
     }
 
     fn exercise_text(&self) -> String {
@@ -259,9 +259,9 @@ impl<'a> MainWidget<'a> {
 
     fn correct_answer_text(&self) -> String {
         let Some(exercise) = self.visible_answer().map(|answer| answer.exercise) else {
-            return "Верный ответ:".to_string();
+            return " Верный ответ: ".to_string();
         };
-        format!("Верный ответ: {}", expected_text(exercise))
+        format!(" Верный ответ: {} ", expected_text(exercise))
     }
 
     fn visible_answer(&self) -> Option<Answer> {

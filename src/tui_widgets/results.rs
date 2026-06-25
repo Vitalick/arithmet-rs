@@ -175,9 +175,14 @@ impl Widget for ResultsWidget<'_> {
 
         Paragraph::new(self.summary_lines())
             .block(
-                Block::bordered()
-                    .border_set(border::PLAIN)
-                    .title(Line::from("Р Е З У Л Ь Т А Т Ы".green().bold()).centered()),
+                Block::bordered().border_set(border::PLAIN).title(
+                    Line::from(vec![
+                        " ".into(),
+                        "Р Е З У Л Ь Т А Т Ы".green().bold(),
+                        " ".into(),
+                    ])
+                    .centered(),
+                ),
             )
             .render(summary_area, buf);
 
