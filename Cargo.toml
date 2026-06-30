@@ -1,6 +1,6 @@
 [package]
 name = "arithmet"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 
 [dependencies]
@@ -18,3 +18,11 @@ color-eyre = "0.6.5"
 crossterm = "0.29.0"
 strum = "0.28.0"
 strum_macros = "0.28.0"
+
+[target.x86_64-apple-darwin]
+linker = "x86_64-apple-darwin-clang"
+ar = "x86_64-apple-darwin-ar"
+
+[target.aarch64-apple-darwin]
+linker = "aarch64-apple-darwin-clang"
+ar = "aarch64-apple-darwin-ar"
